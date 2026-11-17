@@ -3,6 +3,8 @@
 An interactive study guide for §19.3–19.3.4 of Kevin P. Murphy, *Probabilistic Machine Learning: An Introduction*
 (semi-supervised learning, self-training and pseudo-labeling, entropy minimization, the cluster assumption, input-output mutual information, co-training, tri-training and label propagation on graphs).
 
+**Live:** https://isaackrallison.github.io/semi-supervised-learning/
+
 Every section has an **Explain it** box at four levels (Kid, High school, Undergrad, Grad / MLE), switchable globally from the top bar.
 
 - **19.3 Semi-supervised learning:** Fig. 19.8 with a classifier. Pick 1–10 labels per class on two-moons data, compare a supervised RBF logistic regression trained on the labels alone with label propagation over the unlabeled pool, and see accuracy vs number of labels averaged over 12 random draws.
