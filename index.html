@@ -1,0 +1,1906 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Semi-Supervised Learning Lab</title>
+<meta name="description" content="Interactive study guide for §19.3–19.3.4 of Murphy's Probabilistic Machine Learning: semi-supervised learning, self-training and pseudo-labeling, confirmation bias, entropy minimization, the cluster assumption, input-output mutual information, co-training, tri-training and label propagation on graphs. Explanations at four levels, from elementary school to grad-level ML.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<script>
+window.MathJax = {
+  loader: { load: ['[tex]/html'] },
+  tex: { packages: { '[+]': ['html'] }, inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] },
+  svg: { fontCache: 'global' },
+  options: { enableMenu: false }
+};
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js" async></script>
+<style>
+/* Layout: sticky chapter rail + one reading column; every section runs Explain it → Play → Math, slowly → Check yourself */
+:root {
+  --bg: #f3f1ec; --surface: #ffffff; --sunk: #e9e5dc; --ink: #1d1b18; --muted: #5f5a52; --rule: #d9d3c6;
+  --c0: #c0392b; --c1: #1f5fa8; --c2: #1d7a49; --c3: #a35d00; --c4: #6a3fc1; --c5: #0f7f86; --c6: #b0377f; --c7: #6b6b2a;
+  --gap: #a35d00; --mi: #6a3fc1; --green: #1d7a49; --red: #c0392b;
+  --c0-soft: rgba(192,57,43,.13); --c1-soft: rgba(31,95,168,.14); --c2-soft: rgba(29,122,73,.14); --gap-soft: rgba(163,93,0,.16); --mi-soft: rgba(106,63,193,.14); --green-soft: rgba(29,122,73,.14); --red-soft: rgba(192,57,43,.13);
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12110f; --surface: #1b1a17; --sunk: #25231f; --ink: #ece7de; --muted: #a59e92; --rule: #35322c;
+    --c0: #f0776a; --c1: #6ea8ec; --c2: #52c48a; --c3: #e2a34b; --c4: #b393f2; --c5: #4cc4cc; --c6: #ea7fbf; --c7: #c2c26a;
+    --gap: #e2a34b; --mi: #b393f2; --green: #52c48a; --red: #f0776a;
+    --c0-soft: rgba(240,119,106,.18); --c1-soft: rgba(110,168,236,.18); --c2-soft: rgba(82,196,138,.16); --gap-soft: rgba(226,163,75,.2); --mi-soft: rgba(179,147,242,.2); --green-soft: rgba(82,196,138,.16); --red-soft: rgba(240,119,106,.18);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12110f; --surface: #1b1a17; --sunk: #25231f; --ink: #ece7de; --muted: #a59e92; --rule: #35322c;
+  --c0: #f0776a; --c1: #6ea8ec; --c2: #52c48a; --c3: #e2a34b; --c4: #b393f2; --c5: #4cc4cc; --c6: #ea7fbf; --c7: #c2c26a;
+  --gap: #e2a34b; --mi: #b393f2; --green: #52c48a; --red: #f0776a;
+  --c0-soft: rgba(240,119,106,.18); --c1-soft: rgba(110,168,236,.18); --c2-soft: rgba(82,196,138,.16); --gap-soft: rgba(226,163,75,.2); --mi-soft: rgba(179,147,242,.2); --green-soft: rgba(82,196,138,.16); --red-soft: rgba(240,119,106,.18);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 0 80px; display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 48px; }
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 0; padding-inline: 16px; } .rail { display: none; } }
+
+/* top bar */
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); border-bottom: 1px solid var(--rule); }
+.topbar-in { max-width: 1180px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 14px; }
+.brand { font-family: var(--display); font-weight: 800; font-size: 17px; letter-spacing: -.01em; white-space: nowrap; }
+.brand span { color: var(--mi); }
+.chips { display: none; overflow-x: auto; gap: 6px; flex: 1; min-width: 0; scrollbar-width: none; }
+.chips a { font-family: var(--mono); font-size: 12px; white-space: nowrap; padding: 4px 9px; border: 1px solid var(--rule); border-radius: 99px; color: var(--ink); text-decoration: none; }
+@media (max-width: 900px) { .chips { display: flex; } .topbar-in { padding: 10px 16px; flex-wrap: wrap; row-gap: 8px; } .brand { display: none; } }
+.tb-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.score { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; padding: 5px 10px; border-radius: 99px; background: var(--surface); border: 1px solid var(--rule); }
+.score b { color: var(--green); }
+.lvpick { display: inline-flex; border: 1px solid var(--rule); border-radius: 99px; overflow: hidden; background: var(--surface); }
+.lvpick button { font-family: var(--mono); font-size: 11.5px; padding: 5px 9px; border: 0; background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.lvpick button.on { background: var(--mi); color: #fff; }
+@media (max-width: 900px) { .tb-right { margin-left: 0; width: 100%; justify-content: space-between; } }
+
+/* rail */
+.rail nav { position: sticky; top: 70px; padding-top: 40px; display: flex; flex-direction: column; gap: 2px; }
+.rail a { display: grid; grid-template-columns: 70px 1fr; gap: 4px; padding: 6px 8px; border-radius: 6px; color: var(--muted); text-decoration: none; font-family: var(--display); font-size: 14.5px; line-height: 1.3; }
+.rail a .n { font-family: var(--mono); font-size: 11.5px; padding-top: 2px; }
+.rail a:hover, .rail a.on { color: var(--ink); background: var(--sunk); }
+
+main { min-width: 0; }
+header.hero { padding-block: 48px 28px; border-bottom: 1px solid var(--rule); }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(34px, 5.5vw, 58px); line-height: 1.02; letter-spacing: -.025em; margin: 10px 0 16px; text-wrap: balance; }
+h1 .m { color: var(--mi); }
+.lede { max-width: 66ch; color: var(--muted); font-size: 18px; margin: 0 0 12px; }
+.levelcards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 24px; }
+@media (max-width: 760px) { .levelcards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.levelcards button { text-align: left; font-family: var(--body); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; cursor: pointer; }
+.levelcards button b { display: block; font-family: var(--display); font-size: 17px; }
+.levelcards button span { font-size: 14px; color: var(--muted); line-height: 1.35; display: block; margin-top: 2px; }
+.levelcards button.on { border-color: var(--mi); box-shadow: inset 0 0 0 1.5px var(--mi); background: var(--mi-soft); }
+.legend3 { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 22px; font-family: var(--mono); font-size: 12.5px; }
+.legend3 span { display: inline-flex; align-items: center; gap: 8px; }
+.legend3 i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+section.sec { padding-block: 56px 8px; border-bottom: 1px solid var(--rule); scroll-margin-top: 60px; }
+.sec-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.secnum { font-family: var(--mono); font-size: 13px; color: var(--mi); border: 1px solid currentColor; border-radius: 4px; padding: 1px 7px; }
+h2 { font-family: var(--display); font-weight: 700; font-size: clamp(26px, 3.4vw, 36px); line-height: 1.1; letter-spacing: -.02em; margin: 0; text-wrap: balance; }
+.intro { max-width: 66ch; }
+.intro p { margin: 12px 0; }
+
+.block { margin-top: 28px; }
+.blabel { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+.blabel::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+.blabel .tag { color: var(--surface); background: var(--ink); padding: 2px 7px; border-radius: 3px; letter-spacing: .06em; }
+.block.math .blabel .tag { background: var(--c1); }
+.block.quiz .blabel .tag { background: var(--green); }
+.block.play .blabel .tag { background: var(--mi); }
+.block.lv .blabel .tag { background: var(--gap); }
+
+/* level explanations */
+.lvcard { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 0; overflow: hidden; }
+.lvtabs { display: flex; border-bottom: 1px solid var(--rule); background: var(--sunk); overflow-x: auto; scrollbar-width: none; }
+.lvtabs button { font-family: var(--mono); font-size: 12px; padding: 9px 14px; border: 0; border-right: 1px solid var(--rule); background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.lvtabs button.on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: inset 0 -2px 0 var(--mi); }
+.lvbody { padding: 6px 20px 14px; }
+.lvbody > div { max-width: 68ch; }
+.lvbody p, .lvbody li { margin: 10px 0; }
+.lvbody ul, .lvbody ol { padding-left: 22px; }
+.lvbody .big { font-size: 19px; }
+
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 18px; }
+.panel + .panel { margin-top: 16px; }
+.panel h4 { font-family: var(--display); font-weight: 700; font-size: 18px; margin: 0 0 4px; }
+.hint { font-size: 14.5px; color: var(--muted); margin: 0 0 12px; }
+.two { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.two-even { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+@media (max-width: 760px) { .two, .two-even { grid-template-columns: minmax(0, 1fr); } }
+.cap { font-family: var(--mono); font-size: 12px; color: var(--muted); margin: 0 0 4px; }
+
+svg.plot { width: 100%; height: auto; display: block; overflow: visible; touch-action: none; user-select: none; -webkit-user-select: none; }
+svg.drag { cursor: crosshair; }
+svg:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--mi); outline-offset: 2px; }
+.ax { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+.axl { font-family: var(--mono); font-size: 11.5px; fill: var(--ink); }
+.lbl { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+.gridl { stroke: var(--rule); stroke-width: 1; }
+.base { stroke: var(--muted); stroke-width: 1; }
+.handle { cursor: grab; }
+
+.readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 14px; }
+.stat { background: var(--sunk); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.stat .k { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.stat .v { font-family: var(--display); font-weight: 700; font-size: 23px; font-variant-numeric: tabular-nums; line-height: 1.15; overflow-wrap: anywhere; }
+.stat.r .v { color: var(--red); } .stat.b .v { color: var(--c1); } .stat.a .v { color: var(--gap); } .stat.g .v { color: var(--green); } .stat.m .v { color: var(--mi); }
+.chain { font-family: var(--mono); font-size: 13px; background: var(--sunk); border-radius: 8px; padding: 10px 14px; margin-top: 12px; line-height: 1.8; overflow-x: auto; }
+.chain .ok { color: var(--green); font-weight: 600; } .chain .bad { color: var(--red); font-weight: 600; } .chain .a { color: var(--gap); font-weight: 600; } .chain .mu { color: var(--muted); } .chain .m { color: var(--mi); font-weight: 600; }
+.verdict { font-family: var(--display); font-weight: 700; font-size: 20px; margin: 12px 0 0; }
+
+.btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+button.b { font-family: var(--mono); font-size: 12.5px; padding: 7px 12px; border-radius: 6px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+button.b:hover:not(:disabled) { border-color: var(--ink); }
+button.b:disabled { opacity: .4; cursor: default; }
+button.b.pri { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.btns .sep { width: 1px; align-self: stretch; background: var(--rule); margin: 0 4px; }
+.btns .lab { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+label.chk { font-family: var(--mono); font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; }
+.seg button { font-family: var(--mono); font-size: 12px; padding: 7px 11px; border: 0; border-right: 1px solid var(--rule); background: var(--surface); color: var(--ink); cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--mi); color: #fff; }
+
+.ctrl { display: grid; grid-template-columns: 150px minmax(0, 1fr) 64px; align-items: center; gap: 10px; margin: 6px 0; font-family: var(--mono); font-size: 13px; }
+.ctrl label { color: var(--muted); }
+.ctrl output { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) { .ctrl { grid-template-columns: 110px minmax(0, 1fr) 54px; font-size: 12px; } }
+input[type=range] { width: 100%; accent-color: var(--mi); }
+
+/* probability bars */
+.postbars { display: grid; gap: 5px; font-family: var(--mono); font-size: 12px; }
+.postbars .r { display: grid; grid-template-columns: 74px minmax(0, 1fr) 54px; gap: 8px; align-items: center; }
+.postbars .bar { height: 16px; background: var(--sunk); border-radius: 3px; overflow: hidden; }
+.postbars .bar i { display: block; height: 100%; transition: width .2s; }
+.postbars .v { text-align: right; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .postbars .bar i { transition: none; } }
+
+table.t { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+table.t th, table.t td { padding: 5px 8px; border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap; }
+table.t th:first-child, table.t td:first-child { text-align: left; }
+table.t th { color: var(--muted); font-weight: 400; font-size: 11.5px; }
+table.t td.mu { color: var(--muted); }
+table.t.wrap td:first-child { white-space: normal; }
+table.t tr.tot td { border-top: 2px solid var(--rule); font-weight: 600; }
+.scroll { overflow-x: auto; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+
+/* math */
+.mathcard { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 6px 20px 16px; }
+.mathcard + .mathcard { margin-top: 16px; }
+.mathcard h4 { font-family: var(--display); font-weight: 700; font-size: 18px; margin: 16px 0 4px; }
+.mathcard p, .mathcard li { max-width: 68ch; }
+.eq { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+mjx-container[display="true"] { overflow-x: auto; overflow-y: hidden; max-width: 100%; margin: 10px 0 !important; padding: 2px 0; }
+.tr { color: var(--red); } .tb { color: var(--c1); } .ta { color: var(--gap); } .tg { color: var(--green); } .tm { color: var(--mi); }
+.steps { counter-reset: st; list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 4px; }
+.steps > li { counter-increment: st; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-top: 1px dashed var(--rule); }
+.steps > li::before { content: counter(st); font-family: var(--mono); font-size: 12px; color: var(--surface); background: var(--c1); border-radius: 50%; width: 22px; height: 22px; display: grid; place-items: center; margin-top: 4px; }
+.steps .why { color: var(--muted); font-size: 15px; }
+.steps > li > div { min-width: 0; }
+.steps > li > div, .lvbody p, .lvbody li, .mathcard p { overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; }
+.note { border-left: 3px solid var(--gap); padding: 6px 14px; margin: 14px 0; font-size: 15.5px; background: var(--sunk); border-radius: 0 6px 6px 0; }
+
+/* quiz */
+.quizbox { display: grid; gap: 14px; }
+.qq { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; }
+.qq .qt { font-weight: 600; margin: 0 0 10px; }
+.qq .qt .qn { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-right: 8px; font-weight: 400; }
+.qq .qt .ql { font-family: var(--mono); font-size: 11px; color: var(--gap); border: 1px solid currentColor; border-radius: 3px; padding: 0 5px; margin-left: 8px; font-weight: 400; white-space: nowrap; }
+.opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 600px) { .opts { grid-template-columns: minmax(0, 1fr); } }
+.opt { text-align: left; font-family: var(--body); font-size: 15.5px; line-height: 1.4; padding: 9px 12px; border-radius: 7px; border: 1px solid var(--rule); background: var(--bg); color: var(--ink); cursor: pointer; }
+.opt:hover:not(:disabled) { border-color: var(--ink); }
+.opt:disabled { cursor: default; }
+.opt.right { border-color: var(--green); background: var(--green-soft); }
+.opt.wrong { border-color: var(--red); background: var(--red-soft); }
+.why-ans { margin: 10px 0 0; font-size: 15px; padding: 8px 12px; border-radius: 6px; background: var(--sunk); }
+.why-ans b.ok { color: var(--green); } .why-ans b.no { color: var(--red); }
+.quizfoot { display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 12.5px; color: var(--muted); gap: 10px; flex-wrap: wrap; }
+
+table.vs { border-collapse: collapse; width: 100%; font-size: 15px; }
+table.vs th, table.vs td { padding: 9px 10px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+table.vs thead th { font-family: var(--display); font-size: 16px; }
+table.vs tbody th { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--muted); white-space: nowrap; }
+
+footer { padding-block: 32px; color: var(--muted); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* additions for this lab */
+.halo { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.intro p { overflow-x: auto; overflow-y: hidden; }
+.legend3 i.ln { width: 18px; height: 3px; border-radius: 2px; }
+.legend3 i.sq { border-radius: 2px; }
+.legend3 i.ring { background: none !important; border: 2px solid var(--c0); width: 11px; height: 11px; }
+.legend3 i.grey { background: var(--muted); opacity: .6; width: 7px; height: 7px; }
+.verdict.ok { color: var(--green); } .verdict.bad { color: var(--red); } .verdict.meh { color: var(--gap); }
+.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+@media (max-width: 760px) { .three { grid-template-columns: minmax(0, 1fr); } }
+.hov { font-family: var(--mono); font-size: 12.5px; color: var(--muted); min-height: 1.6em; margin: 6px 0 0; }
+.mini { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.keyrow { display: flex; flex-wrap: wrap; gap: 6px 16px; font-family: var(--mono); font-size: 12px; color: var(--muted); margin: 4px 0 6px; }
+.keyrow span { display: inline-flex; align-items: center; gap: 6px; }
+.keyrow i { display: inline-block; width: 16px; height: 3px; border-radius: 2px; }
+.keyrow i.d { height: 0; border-top: 2px dashed currentColor; background: none !important; }
+.keyrow i.c { width: 9px; height: 9px; border-radius: 50%; }
+.keyrow i.h { width: 9px; height: 9px; border-radius: 50%; background: none !important; border: 1.6px solid currentColor; }
+.keyrow i.s { width: 9px; height: 9px; border-radius: 1px; }
+.algo { font-family: var(--mono); font-size: 13px; background: var(--sunk); border-radius: 8px; padding: 10px 14px; margin: 12px 0; line-height: 1.75; overflow-x: auto; }
+.algo .ln { color: var(--muted); display: inline-block; width: 1.6em; }
+.algo .on { background: var(--mi-soft); border-radius: 3px; }
+.algo div { padding: 0 4px; white-space: nowrap; }
+.ramp { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+.ramp i { flex: 0 1 160px; height: 10px; border-radius: 3px; display: block; }
+.pts { cursor: pointer; }
+.bars3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 8px; }
+.tiny { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: center; }
+.prog { height: 4px; background: var(--sunk); border-radius: 2px; overflow: hidden; margin-top: 10px; }
+.prog i { display: block; height: 100%; width: 0; background: var(--mi); }
+.trihead { font-family: var(--mono); font-size: 12px; margin: 0 0 4px; display: flex; justify-content: space-between; gap: 6px; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="topbar-in">
+  <div class="brand">Semi-Supervised <span>Learning</span> Lab</div>
+  <div class="chips">
+    <a href="#ssl">19.3</a><a href="#st">19.3.1</a><a href="#em">19.3.2</a><a href="#cl">19.3.2.1</a><a href="#mi">19.3.2.2</a><a href="#co">19.3.3</a><a href="#lp">19.3.4</a><a href="#cheat">Sheet</a>
+  </div>
+  <div class="tb-right">
+    <div class="lvpick" id="lvpick" role="group" aria-label="Explanation level">
+      <button data-setl="1">Kid</button><button data-setl="2">High school</button><button data-setl="3">Undergrad</button><button data-setl="4">Grad</button>
+    </div>
+    <div class="score" id="score">Quiz <b>0</b> / 0</div>
+  </div>
+</div></div>
+
+<div class="wrap">
+<aside class="rail"><nav id="rail">
+  <a href="#ssl"><span class="n">19.3</span>Semi-supervised learning</a>
+  <a href="#st"><span class="n">19.3.1</span>Self-training and pseudo-labels</a>
+  <a href="#em"><span class="n">19.3.2</span>Entropy minimization</a>
+  <a href="#cl"><span class="n">19.3.2.1</span>The cluster assumption</a>
+  <a href="#mi"><span class="n">19.3.2.2</span>Input-output mutual information</a>
+  <a href="#co"><span class="n">19.3.3</span>Co-training and tri-training</a>
+  <a href="#lp"><span class="n">19.3.4</span>Label propagation on graphs</a>
+  <a href="#cheat"><span class="n">—</span>Cheat sheet</a>
+</nav></aside>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">Murphy, <i>Probabilistic Machine Learning</i> · Chapter 19 · §19.3 – §19.3.4</div>
+  <h1>Six labels, three hundred <span class="m">unlabeled points</span>. Let the shape of the data do the rest.</h1>
+  <p class="lede">Labels are expensive. Transcribing an hour of speech takes many hours, and a medical image may need a doctor. Unlabeled inputs are cheap. <b>Semi-supervised learning</b> (§19.3) uses lots of unlabeled \(\mathbf x\sim p(\mathbf x)\) to learn the overall shape of the data, and only a few labeled pairs \((\mathbf x,y)\sim p(\mathbf x,y)\) to say which part is which class.</p>
+  <p class="lede">This lab covers four ways to do that. In <b>self-training</b> the model labels the data for itself (19.3.1). <b>Entropy minimization</b> pushes the model toward confident predictions, which moves its boundary into the gaps between clusters (19.3.2). In <b>co-training</b> and tri-training, two or three models label data for each other (19.3.3). <b>Label propagation</b> lets labels flow along a similarity graph (19.3.4). Every model on the page is trained live in your browser.</p>
+  <p class="lede">Every section has four parts: <b>Explain it</b> at your level, <b>Play</b>, <b>Math, slowly</b>, and <b>Check yourself</b>. Your quiz score sits in the top bar.</p>
+  <div class="levelcards" id="levelcards">
+    <button data-setl="1"><b>Kid</b><span>Elementary school. Stories, no symbols.</span></button>
+    <button data-setl="2"><b>High school</b><span>Pictures, averages, a bit of algebra.</span></button>
+    <button data-setl="3"><b>Undergrad</b><span>The book's equations and algorithms.</span></button>
+    <button data-setl="4"><b>Grad / MLE</b><span>Theory, failure modes, what modern methods do.</span></button>
+  </div>
+  <p class="hint" style="margin-top:10px">Pick a level here or in the top bar. Every "Explain it" box switches to match, and you can still flip tabs one box at a time.</p>
+  <div class="legend3">
+    <span><i style="background:var(--c0)"></i>class A (labeled)</span>
+    <span><i class="sq" style="background:var(--c1)"></i>class B (labeled)</span>
+    <span><i class="grey"></i>unlabeled point</span>
+    <span><i class="ring"></i>pseudo-label (hollow)</span>
+    <span><i class="ln" style="background:var(--mi)"></i>decision boundary p = ½</span>
+  </div>
+</header>
+
+<!-- ============ 19.3 ============ -->
+<section class="sec" id="ssl">
+  <div class="sec-head"><span class="secnum">§19.3</span><h2>Semi-supervised learning: labels are scarce, inputs are not</h2></div>
+  <div class="intro">
+    <p>Supervised learning assumes a labeled sample from the joint distribution, \(\mathcal D_L=\{(\mathbf x_n,y_n)\}_{n=1}^{N_L}\sim p(\mathbf x,y)\). Semi-supervised learning adds an unlabeled sample from the marginal, \(\mathcal D_U=\{\mathbf x_m\}_{m=1}^{N_U}\sim p(\mathbf x)\), usually with \(N_U\gg N_L\) (Fig. 19.8). The aim is to learn the <b>high-level structure</b> of the data from \(\mathcal D_U\) and use \(\mathcal D_L\) only for the fine details.</p>
+    <p>Unlabeled points carry no \(y\). They help only if we assume something that links \(p(\mathbf x)\) to \(p(y\mid\mathbf x)\). Every method in this section makes such an assumption: that classes form clusters, or that nearby points share a label.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">Imagine sorting a huge pile of seashells, but your teacher only tells you the names of six of them.</p>
+        <p>Six shells isn't much to learn from. But when you spread <b>all</b> the shells out on the floor, you notice they fall into two big piles: long curly ones over here and flat round ones over there. Nobody told you that. You saw it.</p>
+        <p>Now the six named shells just tell you which pile is which. Three of them sit in the curly pile and are called "whelks," so the whole curly pile is probably whelks.</p>
+        <p>That's semi-supervised learning. The shells without names show you the piles, and the few named ones tell you what each pile is called. Names are hard to get (someone has to know them) but shells are everywhere.</p>
+      </div>
+      <div data-l="2">
+        <p>Why not just label everything? Because labels cost time and money. Writing down every word in an hour of recorded speech takes many hours. Labeling a tumor on a scan needs a doctor. Recording people talking, or collecting scans, is cheap by comparison.</p>
+        <p>So we usually have a few <b>labeled</b> examples (input and answer) and a lot of <b>unlabeled</b> ones (input only). The unlabeled inputs can't tell us the answers, but they show us <b>where the data lives</b>: the clumps, curves and gaps.</p>
+        <p>If we assume that points in the same clump share a label, a couple of labels per clump are enough. In the Play box, start with 1 or 2 labels per class. A normal classifier trained on just those points usually cuts right through the moon shapes. Turn on the unlabeled points and the right answer is obvious to your eye. Label propagation, a method from §19.3.4, uses those points and gets it almost exactly right.</p>
+      </div>
+      <div data-l="3">
+        <p>Setup: \(\mathcal D_L\sim p(\mathbf x,y)\), \(\mathcal D_U\sim p(\mathbf x)\), \(N_U\gg N_L\), and we want \(p(y\mid\mathbf x)\). The unlabeled data can only matter through an assumption that ties \(p(\mathbf x)\) to \(p(y\mid\mathbf x)\):</p>
+        <ul>
+          <li><b>Cluster assumption</b> (§19.3.2.1): classes form clusters, so the decision boundary should fall in a <b>low-density</b> region of \(p(\mathbf x)\).</li>
+          <li><b>Manifold assumption</b> (§19.3.4): points that are "similar" (close along the data manifold) probably share a label.</li>
+        </ul>
+        <p>Most methods here can be written as a supervised loss plus an unlabeled term, \(\sum_{(\mathbf x,y)\in\mathcal D_L}\ell(y,f(\mathbf x))+\lambda\sum_{\mathbf x\in\mathcal D_U}r(f,\mathbf x)\). For self-training, \(r\) is the loss against the model's own hard prediction. For entropy minimization, \(r\) is the entropy of \(p_\theta(y\mid\mathbf x)\). Label propagation instead solves for labels on a graph directly.</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Why an assumption is required.</b> Take a discriminative model \(p(y\mid\mathbf x,\theta)\) and a separate input model \(p(\mathbf x\mid\mu)\), with \(\theta\) and \(\mu\) independent a priori. Then the posterior over \(\theta\) doesn't depend on \(\mathcal D_U\) at all (Seeger's argument). Every SSL method breaks this independence somehow: low-density separation, graph or manifold regularization, generative models \(p(\mathbf x\mid y)\), or consistency under augmentation.</li>
+          <li><b>When it hurts.</b> If the assumption is wrong (classes overlap in dense regions, or the unlabeled data have a different class mix or extra classes), unlabeled data can make things worse. Oliver et al. (2018), "Realistic evaluation of deep SSL algorithms", show that gains shrink under class-distribution mismatch and with a properly tuned supervised baseline.</li>
+          <li><b>Transductive vs inductive.</b> Some methods only label the given \(\mathcal D_U\) (label propagation). Others produce \(f\) for any new \(\mathbf x\). You can always turn the first into the second by training a supervised model on the inferred labels.</li>
+          <li><b>Where this goes next.</b> The rest of §19.3 in the book (consistency regularization, MixMatch/FixMatch, generative SSL) builds on these four ideas. FixMatch, for example, is online pseudo-labeling with a confidence threshold plus augmentation.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Fig. 19.8, with a classifier: what do the unlabeled points add?</h3>
+    <div class="panel">
+      <h4>A few labels from p(x, y), many inputs from p(x)</h4>
+      <p class="hint">Two-moons data: 300 points, two classes. Choose how many labels each class gets. The shading is a supervised classifier (logistic regression on RBF features) trained on the labeled points only. Then show the unlabeled points, and color them by label propagation (§19.3.4), which uses them.</p>
+      <div class="ctrl"><label for="ssl-n">labels per class</label><input type="range" id="ssl-n" min="1" max="10" step="1" value="2"><output id="ssl-n-o"></output></div>
+      <div class="btns">
+        <label class="chk"><input type="checkbox" id="ssl-u" checked> show unlabeled x ~ p(x)</label>
+        <label class="chk"><input type="checkbox" id="ssl-lp"> color them by label propagation</label>
+        <button class="b" id="ssl-new">New random labels</button>
+      </div>
+      <div class="two" style="margin-top:12px">
+        <div><p class="cap">labeled points, supervised model p(B | x), unlabeled pool</p><svg class="plot" id="ssl-plot" viewBox="0 0 520 340"></svg></div>
+        <div><p class="cap">accuracy on the unlabeled pool vs labels per class (mean of 12 random draws)</p><svg class="plot" id="ssl-curve" viewBox="0 0 440 300"></svg>
+          <div class="keyrow"><span><i style="background:var(--gap)"></i>supervised only</span><span><i style="background:var(--mi)"></i>label propagation (uses unlabeled)</span></div>
+          <div class="prog" id="ssl-prog"><i></i></div>
+        </div>
+      </div>
+      <div class="readout" id="ssl-stats"></div>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>What we have, what we want</h3>
+    <div class="mathcard">
+      <h4>Two samples, one target</h4>
+      <ol class="steps">
+        <li><div>Labeled: \(\mathcal D_L=\{(\mathbf x_n,y_n)\}_{n=1}^{N_L}\), drawn from the joint \(p(\mathbf x,y)\). <span class="why">This is ordinary supervised data.</span></div></li>
+        <li><div>Unlabeled: \(\mathcal D_U=\{\mathbf x_m\}_{m=1}^{N_U}\), drawn from the marginal \(p(\mathbf x)=\sum_yp(\mathbf x,y)\), with \(N_U\gg N_L\). <span class="why">Fig. 19.8: same inputs, labels hidden.</span></div></li>
+        <li><div>Target: a classifier \(p_\theta(y\mid\mathbf x)\). By Bayes, \(p(y\mid\mathbf x)=p(\mathbf x\mid y)p(y)/p(\mathbf x)\). \(\mathcal D_U\) tells us about the denominator, the <b>shape</b> of \(p(\mathbf x)\), and nothing directly about \(y\).</div></li>
+        <li><div>The link is an assumption. <b>Cluster</b>: \(p(\mathbf x)\) is low where \(p(y\mid\mathbf x)\) changes. <b>Manifold</b>: if \(\mathbf x_i\approx\mathbf x_j\) along the data, then \(y_i=y_j\) is likely.</div></li>
+        <li><div>Generic objective: \(\displaystyle \min_\theta\ \sum_{n\in L}\ell\big(y_n,p_\theta(\cdot\mid\mathbf x_n)\big)+\lambda\sum_{m\in U}r\big(p_\theta(\cdot\mid\mathbf x_m)\big)\). Each subsection picks a different \(r\).</div></li>
+      </ol>
+      <div class="note">The play panel scores both models on the 300 − 2n unlabeled points, which is the transductive setting. Label propagation only produces labels for those points (§19.3.4).</div>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Semi-supervised learning</h3><div class="quizbox" data-quiz="ssl"></div></div>
+</section>
+
+<!-- ============ 19.3.1 ============ -->
+<section class="sec" id="st">
+  <div class="sec-head"><span class="secnum">§19.3.1</span><h2>Self-training and pseudo-labeling: grade your own homework</h2></div>
+  <div class="intro">
+    <p>Train on the labeled data. Predict the unlabeled data. Treat the predictions as labels (<b>pseudo-labels</b>) and train again. Any model that can make predictions can do this, which is why the method has lasted since the 1960s [Scu65].</p>
+    <p>The danger is <b>confirmation bias</b> [TV17]. A wrong prediction becomes a training label, the model learns it, and the error locks in. The usual defense is a <b>selection metric</b>: only keep a pseudo-label when the model's top class probability is above a threshold \(\tau\).</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">A student does a worksheet with no answer key, grades it with their own best guesses, then studies from it.</p>
+        <p>If the student already knows a little, this helps. They're right about the easy questions, and practicing those makes them better at the medium ones. Next time they can grade a few more.</p>
+        <p>But if they started with a wrong idea, like "spiders are insects," they mark that answer right and practice it again and again. Now they believe it even more. That's <b>confirmation bias</b>: you keep "confirming" your own mistake.</p>
+        <p>A good rule: only grade the questions you're <b>really sure</b> about. Skip the rest until you've learned more.</p>
+      </div>
+      <div data-l="2">
+        <p>The recipe:</p>
+        <ol>
+          <li>Train a model on the few labeled points.</li>
+          <li>Ask it about every unlabeled point. If it says "class B, 97% sure," write down "B" as a <b>pseudo-label</b>.</li>
+          <li>Keep only the pseudo-labels above a confidence threshold \(\tau\), say 95%.</li>
+          <li>Retrain on the real labels plus the pseudo-labels. Go back to step 2.</li>
+        </ol>
+        <p>The threshold is a trade-off. Low \(\tau\) (like 50%) labels everything at once, mistakes included, and the model just re-learns its first guess. High \(\tau\) adds only the safest points, so the labels spread out slowly from the regions it's sure about. In the Play box, compare τ = 0.5 with τ = 0.95 on Draw A, then try Draw B, where a bad start goes wrong.</p>
+      </div>
+      <div data-l="3">
+        <p>Two procedures, both common:</p>
+        <ul>
+          <li><b>Offline</b>: pseudo-label all of \(\mathcal D_U\), retrain (maybe from scratch) to convergence on \(\mathcal D_L\cup\) pseudo-labels, re-label, repeat. Works well with huge unlabeled sets [Yal+19; Xie+20]. Downside: labels go <b>stale</b> between re-labelings. The Play box does this.</li>
+          <li><b>Online</b>: each step, take a random batch of unlabeled points, pseudo-label them with the current model, and take a gradient step on them right away. Labels are always fresh, but you pay for constant re-labeling. Used inside methods like FixMatch [Soh+20].</li>
+        </ul>
+        <p>Neither is fundamentally better. Selection metric: keep \(\hat y=\arg\max_cp_\theta(y=c\mid\mathbf x)\) only if \(\max_cp_\theta(y=c\mid\mathbf x)\ge\tau\). If the probabilities are <b>well calibrated</b>, a kept label is correct with probability at least \(\tau\), as judged by the model.</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Hard EM view.</b> Treat the unknown labels as latent variables. Offline self-training alternates an E-step that takes the argmax label (classification EM) with an M-step that refits. Like hard EM, it can converge to a fixed point that just reproduces the initial model. That is what τ = 0.5 does in the demo.</li>
+          <li><b>Calibration is the weak link.</b> Deep nets are often overconfident (Guo et al. 2017), so "p ≥ 0.95" can be wrong far more than 5% of the time. Practical fixes include class-balanced selection, per-class or curriculum thresholds, and temperature scaling before thresholding.</li>
+          <li><b>Modern versions.</b> Noisy Student (Xie et al. 2020) is offline: a teacher labels 300M JFT images, and a larger student trained with dropout, stochastic depth and RandAugment becomes the next teacher. FixMatch (Sohn et al. 2020) is online: pseudo-label a weakly augmented view with τ = 0.95 and train on a strongly augmented view. The noise and augmentation keep the student from simply copying the teacher.</li>
+          <li><b>Theory.</b> Wei et al. (2021) show self-training can provably fix pseudo-label errors under an "expansion" assumption on the class-conditional distributions, plus a consistency regularizer. This is a formal version of the cluster assumption.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Offline self-training, one round at a time</h3>
+    <div class="panel">
+      <h4>Pseudo-label, retrain, repeat</h4>
+      <p class="hint">Three labeled points per class (large marks) and 294 unlabeled ones. Each <b>Round</b> pseudo-labels every unlabeled point whose top probability is at least τ (hollow marks), then retrains on labels plus pseudo-labels. <b>Click any point</b> to have an "expert" label it, or click a labeled point to unlabel it. Test accuracy is measured on 400 fresh points.</p>
+      <div class="btns" style="margin-top:0">
+        <div class="seg" id="st-draw"><button data-v="51" class="on">Draw A</button><button data-v="15">Draw B (bias)</button><button data-v="rand">Random draw</button></div>
+        <label class="chk"><input type="checkbox" id="st-wrong" checked> mark wrong pseudo-labels ×</label>
+      </div>
+      <div class="ctrl"><label for="st-tau">threshold τ</label><input type="range" id="st-tau" min="0.5" max="0.995" step="0.005" value="0.95"><output id="st-tau-o"></output></div>
+      <div class="btns">
+        <button class="b pri" id="st-step">Round</button><button class="b" id="st-run">Run to convergence</button><button class="b" id="st-reset">Back to round 0</button>
+      </div>
+      <div class="two" style="margin-top:14px">
+        <div><p class="cap">p(B | x), decision boundary, labels and pseudo-labels</p><svg class="plot pts" id="st-plot" viewBox="0 0 520 340"></svg></div>
+        <div><p class="cap">vs round</p><svg class="plot" id="st-curve" viewBox="0 0 440 260"></svg>
+          <div class="keyrow"><span><i style="background:var(--mi)"></i>test accuracy</span><span><i style="background:var(--green)"></i>pseudo-label accuracy</span><span><i class="d" style="color:var(--muted)"></i>fraction pseudo-labeled</span></div>
+          <div class="algo" id="st-algo"></div>
+        </div>
+      </div>
+      <div class="readout" id="st-stats"></div>
+      <p class="verdict" id="st-say" style="font-size:17px"></p>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Pseudo-labels and the selection metric</h3>
+    <div class="mathcard">
+      <h4>One round of offline self-training</h4>
+      <ol class="steps">
+        <li><div>Fit \(\theta_0=\arg\min_\theta\sum_{n\in L}-\log p_\theta(y_n\mid\mathbf x_n)\) (plus regularization).</div></li>
+        <li><div>For each \(\mathbf x_m\in\mathcal D_U\), the pseudo-label is \(\hat y_m=\arg\max_cp_{\theta_t}(y=c\mid\mathbf x_m)\) and the confidence is \(s_m=\max_cp_{\theta_t}(y=c\mid\mathbf x_m)\).</div></li>
+        <li><div>Selection metric: keep \(S_t=\{m: s_m\ge\tau\}\) [Yar95; RHS05]. <span class="why">With two classes, \(s_m\ge0.5\) always holds, so τ = 0.5 keeps everything.</span></div></li>
+        <li><div>Refit: \(\theta_{t+1}=\arg\min_\theta\sum_{n\in L}-\log p_\theta(y_n\mid\mathbf x_n)+\sum_{m\in S_t}-\log p_\theta(\hat y_m\mid\mathbf x_m)\).</div></li>
+        <li><div>Repeat until \(S_t\) and the \(\hat y_m\) stop changing. <span class="why">If \(\theta_{t+1}\) predicts every \(\hat y_m\) it was trained on, nothing changes: a fixed point, right or wrong.</span></div></li>
+      </ol>
+      <div class="note">The online variant replaces step 4 with one gradient step on a fresh mini-batch. Its unlabeled loss is \(-\log p_\theta(\hat y\mid\mathbf x)=-\max_c\log p_\theta(y=c\mid\mathbf x)\), Eq. 19.16, which leads straight into entropy minimization.</div>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Self-training</h3><div class="quizbox" data-quiz="st"></div></div>
+</section>
+
+<!-- ============ 19.3.2 ============ -->
+<section class="sec" id="em">
+  <div class="sec-head"><span class="secnum">§19.3.2</span><h2>Entropy minimization: reward confident predictions</h2></div>
+  <div class="intro">
+    <p>Online self-training with cross-entropy minimizes \(\mathcal L=-\max_c\log p_\theta(y=c\mid\mathbf x)\) on unlabeled data (Eq. 19.16). It is smallest when one class gets all the probability, so it quietly pushes the model toward <b>low-entropy</b>, high-confidence predictions. <b>Entropy minimization</b> [GB05] does that on purpose:</p>
+    <p>\[ \mathcal L=-\sum_{c=1}^Cp_\theta(y=c\mid\mathbf x)\log p_\theta(y=c\mid\mathbf x). \qquad (19.17) \]</p>
+    <p>Both are cross-entropies \(-\sum_cq_c\log p_c\), with different targets \(q\). Self-training uses the <b>hard</b> one-hot target \(\arg\max p\). Entropy minimization uses the <b>soft</b> target \(p\) itself. Sharpening with a temperature \(T\), \(q_c\propto p_c^{1/T}\), moves between them (MixMatch). \(T=1\) gives entropy minimization, and \(T\to0\) gives hard self-training.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">This rule tells the model: "Don't be wishy-washy."</p>
+        <p>Suppose the model looks at a picture and says "50% cat, 50% dog." That's a shrug. Entropy is a number that measures how much of a shrug an answer is. A 50/50 answer has the most entropy, and a 100/0 answer has none.</p>
+        <p>Entropy minimization gives the model a small penalty every time it shrugs at an unlabeled picture. Self-training is the strict version: "Pick your favorite answer and act as if you're totally sure." The sharpening knob \(T\) lets you choose anything in between.</p>
+      </div>
+      <div data-l="2">
+        <p>For two classes with probability \(p\) for class B, the entropy is \(H(p)=-p\ln p-(1-p)\ln(1-p)\). It is 0 when \(p=0\) or \(1\), and largest, \(\ln2\approx0.69\), at \(p=\tfrac12\).</p>
+        <p>The plot uses the model's raw score (logit) \(z\) on the horizontal axis, with \(p=\sigma(z)=1/(1+e^{-z})\). All three losses peak at \(z=0\), where the model is least sure, and drop as \(|z|\) grows. Self-training's curve has a sharp corner at 0. Entropy is smooth and flat on top. Sharpening with \(T=\tfrac12\) falls in between.</p>
+        <p>Drag across the plot to move \(z\), and change \(T\) to see the target \(q\) move from "soft" (\(q=p\)) toward "hard" (one-hot).</p>
+      </div>
+      <div data-l="3">
+        <p>Write every loss as a cross-entropy \(H(q,p)=-\sum_cq_c\log p_c\):</p>
+        <ul>
+          <li>Self-training (19.16): \(q=\text{onehot}(\arg\max_cp_c)\), so \(H(q,p)=-\log\max_cp_c\).</li>
+          <li>Entropy minimization (19.17): \(q=p\), so \(H(p,p)=H(p)\).</li>
+          <li>Sharpened: \(q_c=p_c^{1/T}/\sum_kp_k^{1/T}\). For two classes, \(q=\sigma(z/T)\).</li>
+        </ul>
+        <p>All three are minimized by putting all the mass on one class, and all three are \(\ln2\) at \(z=0\). They differ in how hard they push near the boundary and far from it. That changes how fast the model becomes confident, and how much it trusts its early mistakes.</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Gradients, binary case.</b> \(dH/dz=-z\,p(1-p)\). This is zero at \(z=0\) (an unstable equilibrium) and largest around \(|z|\approx1.5\). Self-training: \(\frac{d}{dz}\operatorname{softplus}(-|z|)=-\operatorname{sgn}(z)\,\sigma(-|z|)\), which has magnitude \(\tfrac12\) right at the boundary. So hard targets push points near the boundary hardest.</li>
+          <li><b>Stop-gradient matters.</b> MixMatch and UDA treat the sharpened target \(q\) as a constant. The gradient of \(H(q,p)\) with respect to the logits is \(p-q\). With \(T=1\) and a stopped gradient this is <b>exactly zero</b>, so sharpening only does something when \(T&lt;1\). Entropy minimization backpropagates through both copies of \(p\). Same value, different gradient.</li>
+          <li><b>As a prior.</b> Grandvalet &amp; Bengio (2005) derive the entropy term as a MAP prior that favors small class overlap. MixMatch uses \(T=0.5\). UDA combines sharpening (\(T=0.4\)) with confidence masking.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Fig. 19.9, live</h3>
+    <div class="panel">
+      <h4>Three losses on one unlabeled point, binary case</h4>
+      <p class="hint">Horizontal axis: the logit \(z\), with \(p(B)=\sigma(z)\). Drag across the plot to move the point. The purple curve is the sharpened loss at your \(T\). At \(T=1\) it sits on the green entropy curve, and as \(T\to0\) it approaches the orange self-training curve.</p>
+      <div class="ctrl"><label for="em-T">temperature T</label><input type="range" id="em-T" min="0.02" max="1" step="0.01" value="0.5"><output id="em-T-o"></output></div>
+      <div class="keyrow"><span><i style="background:var(--c5)"></i>entropy minimization</span><span><i style="background:var(--c3)"></i>self-training</span><span><i class="d" style="color:var(--c6)"></i>sharpened, T = ½ (book)</span><span><i style="background:var(--mi)"></i>sharpened, your T</span></div>
+      <div class="two">
+        <div><svg class="plot drag" id="em-plot" viewBox="0 0 520 300" tabindex="0" aria-label="Loss versus logit"></svg></div>
+        <div>
+          <p class="cap">the model's p and the target q each loss trains toward</p>
+          <div class="postbars" id="em-bars"></div>
+          <div class="readout" id="em-stats"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Equations 19.16–19.17 and sharpening</h3>
+    <div class="mathcard">
+      <h4>One family of cross-entropies</h4>
+      <ol class="steps">
+        <li><div>Online self-training, hard target \(\hat c=\arg\max_cp_\theta(y=c\mid\mathbf x)\): \(\mathcal L=-\log p_\theta(y=\hat c\mid\mathbf x)=-\max_c\log p_\theta(y=c\mid\mathbf x)\). <span class="why">(19.16)</span></div></li>
+        <li><div>This is minimized when \(p(y=c^*\mid\mathbf x)=1\) and \(p(y\ne c^*\mid\mathbf x)=0\): a confident prediction.</div></li>
+        <li><div>Entropy minimization keeps the soft target: \(\mathcal L=-\sum_cp_c\log p_c=H(p)\). <span class="why">(19.17) Also minimized by any one-hot \(p\).</span></div></li>
+        <li><div>Swap the first \(p_c\) in (19.17) for the one-hot \(\mathbb I(c=\hat c)\) and you get back (19.16).</div></li>
+        <li><div>Temperature: \(q_c=\dfrac{p_c^{1/T}}{\sum_kp_k^{1/T}}\), \(\mathcal L_T=-\sum_cq_c\log p_c\). \(T=1\Rightarrow q=p\) (entropy). \(T\to0\Rightarrow q\to\) one-hot (self-training).</div></li>
+        <li><div>Binary, with logit \(z\): \(p=\sigma(z)\) and \(q=\sigma(z/T)\). Entropy \(=\operatorname{softplus}(z)-z\sigma(z)\). Self-training \(=\operatorname{softplus}(-|z|)\). All equal \(\ln2\) at \(z=0\).</div></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Entropy minimization</h3><div class="quizbox" data-quiz="em"></div></div>
+</section>
+
+<!-- ============ 19.3.2.1 ============ -->
+<section class="sec" id="cl">
+  <div class="sec-head"><span class="secnum">§19.3.2.1</span><h2>The cluster assumption: put the boundary where the data isn't</h2></div>
+  <div class="intro">
+    <p>Many SSL methods assume the decision boundary should fall in a <b>low-density region</b>: classes form clusters, and a good boundary separates the clusters instead of cutting through one. Suppose the model is <b>smooth</b>, so its prediction doesn't jump abruptly. Then a boundary through a dense region forces high-entropy predictions on every sample near it. Minimizing average entropy on unlabeled data therefore pushes the boundary out of the dense regions and into the gaps (Fig. 19.10).</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">If you have to build a fence between two herds of sheep, don't build it through the middle of a herd.</p>
+        <p>Sheep standing right next to the fence can't tell which side they belong on. They're unsure. If the fence goes through a crowded herd, lots of sheep are unsure. If it goes through the empty field between the herds, almost nobody is near it, so almost nobody is unsure.</p>
+        <p>Entropy minimization doesn't like unsure sheep, so it keeps sliding the fence until it sits in the empty field. Watch out, though. You could also make nobody unsure by moving the fence far off to the side so that <b>every</b> sheep is in one herd. That's cheating. The few labeled sheep (and a rule from the next section) stop it.</p>
+      </div>
+      <div data-l="2">
+        <p>A smooth classifier goes from "surely A" to "surely B" over some distance. Points inside that strip get answers near 50/50, which means high entropy. So <b>average entropy over unlabeled points ≈ how many points sit near the boundary</b>.</p>
+        <p>The right-hand plot slides the boundary sideways (keeping its angle) and shows the average entropy at each position. It has a valley in the gap between the clusters. That valley is where entropy minimization pulls the boundary.</p>
+        <p>The curve also drops at both ends, where the boundary has left the data entirely and every point is called the same class. Draw B starts close enough to that trap that plain entropy minimization falls into it. Turn on the balance term (§19.3.2.2) and run again.</p>
+      </div>
+      <div data-l="3">
+        <p>Objective in the demo, with a linear logistic model \(p(B\mid\mathbf x)=\sigma(\mathbf w^\top\mathbf x+b)\):</p>
+        <p>\[ \mathcal J=\tfrac1{N_L}\textstyle\sum_{L}\text{CE}+\lambda_u\,\tfrac1{N_U}\sum_UH(p_m)-\lambda_b\,H(\bar p)+\tfrac{\kappa}{2}\|\mathbf w\|^2, \]</p>
+        <p>where \(\bar p=\frac1{N_U}\sum_mp_m\). With \(\lambda_b=0\) this is entropy minimization. With \(\lambda_u=\lambda_b\) it is the mutual-information loss of §19.3.2.2.</p>
+        <p>Entropy minimization also likes a large \(\|\mathbf w\|\), because scaling up the logits makes every prediction more confident. The small weight decay \(\kappa\) keeps that in check. Watch \(\|\mathbf w\|\) grow while the boundary rotates into the gap.</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Low-density separation.</b> The transductive SVM (Vapnik; Joachims 1999) maximizes the margin over labeled <b>and</b> unlabeled points. Its hinge on unlabeled points, \(\max(0,1-|f(\mathbf x)|)\), is a non-smooth cousin of the entropy penalty. Chapelle &amp; Zien (2005) make the link explicit. Both objectives are non-convex, so the starting point matters (Draw A vs B).</li>
+          <li><b>Balance constraints.</b> TSVMs need a constraint that the fraction of unlabeled points given each class matches the labeled data. Without it, they put all unlabeled points in one class. That is the same degenerate solution as here, and the \(H(\bar p)\) term plays the same role.</li>
+          <li><b>Smoothness isn't automatic for deep nets.</b> The argument needs \(f\) to change slowly in input space. A deep net can make a sharp, confident boundary through a cluster. That is why entropy minimization is usually paired with consistency or adversarial smoothing (VAT, Miyato et al. 2018) rather than used alone.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Fig. 19.10: slide the boundary out of the clusters</h3>
+    <div class="panel">
+      <h4>Entropy minimization on a linear classifier</h4>
+      <p class="hint">Two labeled points (drag them) and 200 unlabeled ones. <b>Run</b> does gradient descent on labeled cross-entropy + λ<sub>u</sub> × mean entropy (− λ<sub>b</sub> × H(p̄) if you turn on the balance term). Hover an unlabeled point to see its predicted probabilities, as in the bar plots of Fig. 19.10.</p>
+      <div class="btns" style="margin-top:0">
+        <div class="seg" id="cl-preset"><button data-v="a" class="on">Draw A</button><button data-v="b">Draw B (trap)</button></div>
+        <label class="chk"><input type="checkbox" id="cl-true"> show true classes</label>
+      </div>
+      <div class="ctrl"><label for="cl-lu">entropy weight λᵤ</label><input type="range" id="cl-lu" min="0" max="3" step="0.1" value="1"><output id="cl-lu-o"></output></div>
+      <div class="ctrl"><label for="cl-lb">balance weight λ_b</label><input type="range" id="cl-lb" min="0" max="3" step="0.1" value="0"><output id="cl-lb-o"></output></div>
+      <div class="btns">
+        <button class="b pri" id="cl-run">Run</button><button class="b" id="cl-step">+50 steps</button><button class="b" id="cl-reset">Reset to supervised fit</button>
+      </div>
+      <div class="two" style="margin-top:14px">
+        <div><p class="cap">p(B | x) and the boundary (drag the big labeled points)</p><svg class="plot pts" id="cl-plot" viewBox="0 0 520 360"></svg>
+          <p class="hov" id="cl-hov">Hover an unlabeled point.</p>
+          <div class="postbars" id="cl-bars"></div>
+        </div>
+        <div><p class="cap">slide the current boundary sideways: unlabeled loss vs position</p><svg class="plot drag" id="cl-prof" viewBox="0 0 440 300"></svg>
+          <div class="keyrow"><span><i style="background:var(--c5)"></i>mean entropy E[H(p)]</span><span><i style="background:var(--mi)"></i>E[H(p)] − H(p̄) = −I</span><span><i class="s" style="background:var(--muted);opacity:.35"></i>data along the normal</span></div>
+          <p class="hint" style="margin:4px 0 0">Click the profile to jump the boundary to that position.</p>
+        </div>
+      </div>
+      <div class="readout" id="cl-stats"></div>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Why entropy pushes the boundary into gaps</h3>
+    <div class="mathcard">
+      <h4>Mean entropy counts the points near the boundary</h4>
+      <ol class="steps">
+        <li><div>Linear model: \(z=\mathbf w^\top\mathbf x+b\), \(p=\sigma(z)\). The signed distance to the boundary is \(d=z/\|\mathbf w\|\), so \(z=\|\mathbf w\|d\).</div></li>
+        <li><div>\(H(\sigma(z))\) is about \(\ln2\) for \(|z|\lesssim1\) and falls off like \(|z|e^{-|z|}\) beyond that. So it acts like a bump of width about \(1/\|\mathbf w\|\) around the boundary.</div></li>
+        <li><div>Mean unlabeled entropy \(\approx\int p(\mathbf x)H(\sigma(\|\mathbf w\|d(\mathbf x)))d\mathbf x\approx\) (density of data near the boundary) × (bump area). <span class="why">That is the cluster assumption written as a loss.</span></div></li>
+        <li><div>Gradient for one unlabeled point: \(\partial H/\partial z=-z\,p(1-p)\). Points on the B side (\(z&gt;0\)) push \(z\) up and points on the A side push it down. Both push the boundary <b>away</b> from themselves.</div></li>
+        <li><div>Degenerate minimum: if \(|z|\) is large for every point (boundary off the data), \(H\approx0\) everywhere. The labeled loss, and the \(-H(\bar p)\) term of §19.3.2.2, rule this out.</div></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>The cluster assumption</h3><div class="quizbox" data-quiz="cl"></div></div>
+</section>
+
+<!-- ============ 19.3.2.2 ============ -->
+<section class="sec" id="mi">
+  <div class="sec-head"><span class="secnum">§19.3.2.2</span><h2>Input-output mutual information: confident, and not all one class</h2></div>
+  <div class="intro">
+    <p>Bridle, Heading and MacKay [BHM92] get entropy minimization from a different starting point: <b>maximize the mutual information</b> between the input and the predicted label. Negated, it splits into two terms:</p>
+    <p>\[ \mathcal L(y;\mathbf x)=-\mathbb E_{\mathbf x}\Big[\sum_ip(y_i\mid\mathbf x)\log p(y_i\mid\mathbf x)\Big]+\sum_i\mathbb E_{\mathbf x}[p(y_i\mid\mathbf x)]\log\mathbb E_{\mathbf x}[p(y_i\mid\mathbf x)]. \qquad (19.25) \]</p>
+    <p>The first term is the mean entropy, which makes each prediction confident. The second term equals \(-H(\bar p)\), and minimizing it makes the <b>average</b> prediction spread out.</p>
+    <p>So the first term is entropy minimization. The second wants the average prediction \(\bar p=\mathbb E_{\mathbf x}[p(y\mid\mathbf x)]\) to have high entropy, so every class gets used. That is only appropriate when we know a priori that the classes are about equally likely.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">Two rules: be sure about each one, and don't put everyone in the same box.</p>
+        <p>Entropy minimization alone has a cheat. If the model says "box 1, totally sure!" for every single thing, it's never unsure, and it gets a perfect score. But that's useless.</p>
+        <p>Mutual information adds a second rule: if you look at all the answers together, every box should get used. Now the only way to win is to be sure about each thing <b>and</b> spread things across the boxes.</p>
+      </div>
+      <div data-l="2">
+        <p>Nine unlabeled points, three classes. Each point gets a bar chart of probabilities. Two numbers:</p>
+        <ul>
+          <li><b>Average of the entropies</b>, \(\mathbb E[H(p)]\): how unsure the model is about a typical point. We want this <b>low</b>.</li>
+          <li><b>Entropy of the average</b>, \(H(\bar p)\): average the nine bar charts into one, then measure how spread out that is. We want this <b>high</b> (at most \(\ln3\approx1.10\)).</li>
+        </ul>
+        <p>Mutual information is \(I=H(\bar p)-\mathbb E[H(p)]\). Turn confidence up and the pull toward class A all the way up. The entropy-minimization loss is perfect, near 0, but \(I\approx0\) too. Now turn the pull back to 0 and \(I\) reaches its maximum, \(\ln3\).</p>
+      </div>
+      <div data-l="3">
+        <p>Equations 19.18–19.25 are the identity \(I(y;\mathbf x)=H(y)-H(y\mid\mathbf x)\) written out for a classifier:</p>
+        <ul>
+          <li>\(H(y\mid\mathbf x)=\mathbb E_{\mathbf x}[H(p(y\mid\mathbf x))]\): mean per-point entropy, the entropy-minimization term.</li>
+          <li>\(H(y)=H(\bar p)\) with \(p(y)=\int p(\mathbf x)p(y\mid\mathbf x)d\mathbf x=\mathbb E_{\mathbf x}[p(y\mid\mathbf x)]\): the marginal over predicted labels.</li>
+        </ul>
+        <p>Minimizing \(-I\) gives confident and balanced predictions. In practice the expectation is a mean over the unlabeled set or a mini-batch. To match a known non-uniform class prior \(\pi\), replace \(-H(\bar p)\) with \(\mathrm{KL}(\bar p\,\|\,\pi)\).</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Lineage.</b> Bridle, Heading &amp; MacKay (1992), "Unsupervised classifiers, mutual information and phantom targets." Krause, Perona &amp; Gomes (2010), Regularized Information Maximization (RIM), add a weight penalty and use it for discriminative clustering. IIC (Ji et al. 2019) maximizes MI between the predictions for two augmentations of the same image.</li>
+          <li><b>Mini-batch bias.</b> \(H(\bar p)\) is a nonlinear function of a mean, so estimating it on a batch is biased, and small batches can't represent many classes. Implementations use large batches or a running average of \(\bar p\).</li>
+          <li><b>Relation to TSVM balancing.</b> \(H(\bar p)\) is a soft version of the class-proportion constraint in transductive SVMs, and of the "distribution alignment" step in ReMixMatch, which rescales predictions so \(\bar p\) matches the labeled class marginal.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Mean entropy vs entropy of the mean</h3>
+    <div class="panel">
+      <h4>Nine unlabeled points, three classes</h4>
+      <p class="hint"><b>Confidence</b> scales every logit. <b>Pull toward A</b> moves every point's preferred class toward class A (0 = each class gets three points, 1 = everyone prefers A). The two maps show each loss over both sliders. Darker means lower loss, the place training wants to go. Click a map to jump there.</p>
+      <div class="ctrl"><label for="mi-s">confidence</label><input type="range" id="mi-s" min="0" max="6" step="0.05" value="2"><output id="mi-s-o"></output></div>
+      <div class="ctrl"><label for="mi-c">pull toward A</label><input type="range" id="mi-c" min="0" max="1" step="0.01" value="0.2"><output id="mi-c-o"></output></div>
+      <div class="two" style="margin-top:12px">
+        <div>
+          <p class="cap">p(y | xₘ) for each point, then the average p̄</p>
+          <svg class="plot" id="mi-bars" viewBox="0 0 520 210"></svg>
+          <div class="readout" id="mi-stats"></div>
+        </div>
+        <div>
+          <div class="two-even" style="gap:10px">
+            <div><p class="cap">entropy min: E[H(p)]</p><svg class="plot drag" id="mi-h1" viewBox="0 0 220 230"></svg></div>
+            <div><p class="cap">MI loss: E[H(p)] − H(p̄)</p><svg class="plot drag" id="mi-h2" viewBox="0 0 220 230"></svg></div>
+          </div>
+          <div class="ramp"><span>low loss</span><i id="mi-ramp"></i><span>high</span></div>
+        </div>
+      </div>
+      <p class="verdict" id="mi-say" style="font-size:17px"></p>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Equations 19.18–19.25</h3>
+    <div class="mathcard">
+      <h4>From mutual information to a loss</h4>
+      <ol class="steps">
+        <li><div>\(I(y;\mathbf x)=\iint p(y,\mathbf x)\log\dfrac{p(y,\mathbf x)}{p(y)p(\mathbf x)}\,dy\,d\mathbf x\). <span class="why">(19.18) Definition, §6.3.</span></div></li>
+        <li><div>Write \(p(y,\mathbf x)=p(y\mid\mathbf x)p(\mathbf x)\) and cancel \(p(\mathbf x)\) inside the log: \(=\int p(\mathbf x)\int p(y\mid\mathbf x)\log\dfrac{p(y\mid\mathbf x)}{p(y)}\,dy\,d\mathbf x\). <span class="why">(19.19–19.20)</span></div></li>
+        <li><div>The marginal is \(p(y)=\int p(\mathbf x)p(y\mid\mathbf x)d\mathbf x=\mathbb E_{\mathbf x}[p(y\mid\mathbf x)]\). <span class="why">(19.21)</span></div></li>
+        <li><div>Outer integral → \(\mathbb E_{\mathbf x}\), inner integral → sum over the \(L\) classes: \(I=\mathbb E_{\mathbf x}\Big[\sum_ip(y_i\mid\mathbf x)\log\dfrac{p(y_i\mid\mathbf x)}{\mathbb E_{\mathbf x}[p(y_i\mid\mathbf x)]}\Big]\). <span class="why">(19.22)</span></div></li>
+        <li><div>Split the log. The second piece is \(\sum_i\mathbb E_{\mathbf x}[p(y_i\mid\mathbf x)]\log\mathbb E_{\mathbf x}[p(y_i\mid\mathbf x)]=\sum_i\bar p_i\log\bar p_i=-H(\bar p)\). <span class="why">(19.23–19.24)</span></div></li>
+        <li><div>So \(I=H(\bar p)-\mathbb E_{\mathbf x}[H(p(y\mid\mathbf x))]\), and the loss is \(\mathcal L=-I=\mathbb E_{\mathbf x}[H(p)]-H(\bar p)\). <span class="why">(19.25) Range: \(-\log L\le\mathcal L\le0\).</span></div></li>
+      </ol>
+      <div class="note">In (19.24) the book writes the second term as \(\sum_i\mathbb E_{\mathbf x}[p(y_i\mid\mathbf x)\log\mathbb E_{\mathbf x}[p(y_i\mid\mathbf x)]]\). The inner \(\log\mathbb E_{\mathbf x}[\cdot]\) is a constant with respect to the outer expectation, so this equals \(\sum_i\bar p_i\log\bar p_i\).</div>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Mutual information</h3><div class="quizbox" data-quiz="mi"></div></div>
+</section>
+
+<!-- ============ 19.3.3 ============ -->
+<section class="sec" id="co">
+  <div class="sec-head"><span class="secnum">§19.3.3</span><h2>Co-training and tri-training: models that label data for each other</h2></div>
+  <div class="intro">
+    <p><b>Co-training</b> [BM98] assumes two complementary <b>views</b> of each example, two sets of features that are each good enough to train a reasonable classifier. Train one model per view. When one model is confident about an unlabeled point (low entropy) and the other is not (high entropy), add that point, with the confident model's label, to the <b>unsure</b> model's training set. Retrain and repeat.</p>
+    <p>Two independent views are a strong assumption. <b>Tri-training</b> [ZL05] needs no views. It trains three models on bootstrap samples of the labeled data, and when two of them agree on an unlabeled point, that label goes to the third.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">Two friends identify animals at the zoo. One can only see them, and the other can only hear them.</p>
+        <p>Sometimes the "eyes" friend is sure ("That's a lion, I can see the mane!") but the "ears" friend isn't sure, because the lion is quiet. So the eyes friend tells the ears friend: "That one is a lion. Remember what it sounded like." Other times, the ears friend is sure because of the roar, and teaches the eyes friend.</p>
+        <p>This works because seeing and hearing are <b>different clues</b>. If both friends could only see, they'd be confused by the same animals and couldn't help each other.</p>
+        <p>Tri-training uses three friends. When two of them agree, they teach the third.</p>
+      </div>
+      <div data-l="2">
+        <p>Blum and Mitchell's example: classify web pages as "course homepage" or not. View 1 is the words on the page. View 2 is the words in links pointing <b>to</b> the page, like "my CS 473 page." Either view alone works fairly well.</p>
+        <p>The trick: a page that is hard for view 1 is usually <b>not</b> especially hard for view 2. So view 2's confident answers teach view 1 about exactly the cases it struggles with, and vice versa.</p>
+        <p>In the Play box both plots show the same 300 points, each in a different view. Hover a point to find it in the other plot. Switch to <b>correlated views</b>, where view 2 is just a rotated copy of view 1. Now the hard points are hard for both models, and co-training stalls.</p>
+      </div>
+      <div data-l="3">
+        <p><b>Co-training loop</b>: fit \(f_1\) on view 1 and \(f_2\) on view 2 of \(\mathcal D_L\). For each unlabeled \(\mathbf x\), if \(f_1\) is confident (\(\max p\ge\tau\)) and \(f_2\) isn't, add \((\mathbf x,\hat y_1)\) to \(f_2\)'s training set, and symmetrically. Retrain. Assumptions: each view is <b>sufficient</b>, and the views are <b>conditionally independent given \(y\)</b>.</p>
+        <p><b>Tri-training</b>: bootstrap \(\mathcal D_L\) three times (sampling with replacement), giving three somewhat different models. For each \(\mathbf x\in\mathcal D_U\) and each model \(k\), if the other two agree on \(\hat y\), add \((\mathbf x,\hat y)\) to model \(k\)'s set. Retrain on labeled + new pseudo-labels and repeat. "Two different models agree" is the selection metric.</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>PAC guarantee.</b> Blum &amp; Mitchell (1998) show that if the views are conditionally independent given \(y\) and the target is learnable from each view, a weakly useful initial predictor can be boosted to arbitrary accuracy using only unlabeled data. The reason: conditional independence makes a confident view-1 label behave like a random labeled example for view 2, with class-dependent noise but no selection bias.</li>
+          <li><b>Weaker conditions.</b> Balcan, Blum &amp; Yang (2005) replace independence with "ε-expansion": the set of confident examples must keep growing into the region where the other view is uncertain. Co-regularization (Sindhwani et al. 2005) turns view agreement into a loss term.</li>
+          <li><b>Tri-training details.</b> Zhou &amp; Li's (2005) original algorithm only adds the agreed labels when an error-rate condition (estimated on labeled data) guarantees that the extra examples outweigh their noise. The book's simplified version, used here, can let all three models converge to the same answer, after which nobody can teach anybody.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Co-training with two views, then tri-training</h3>
+    <div class="panel">
+      <h4>Co-training: same points, two feature sets</h4>
+      <p class="hint">Each point has a view-1 feature pair (left) and a view-2 pair (right). Two labeled points per class. Each round, every model hands its <b>k</b> most confident points, where it is at least τ sure and the other model isn't, to the other model (hollow marks, newest ringed in purple). Accuracy is on 1,000 test points. "Both" multiplies the two models' odds.</p>
+      <div class="btns" style="margin-top:0">
+        <div class="seg" id="co-views"><button data-v="ind" class="on">Independent views</button><button data-v="corr">Correlated views</button></div>
+        <button class="b" id="co-new">New labeled draw</button>
+      </div>
+      <div class="ctrl"><label for="co-tau">confident if ≥ τ</label><input type="range" id="co-tau" min="0.6" max="0.99" step="0.01" value="0.9"><output id="co-tau-o"></output></div>
+      <div class="ctrl"><label for="co-k">k per round</label><input type="range" id="co-k" min="1" max="30" step="1" value="10"><output id="co-k-o"></output></div>
+      <div class="btns"><button class="b pri" id="co-step">Round</button><button class="b" id="co-run">Run 15 rounds</button><button class="b" id="co-reset">Back to round 0</button></div>
+      <div class="two-even" style="margin-top:14px">
+        <div><p class="cap">view 1: model f₁</p><svg class="plot pts" id="co-a" viewBox="0 0 400 320"></svg></div>
+        <div><p class="cap">view 2: model f₂</p><svg class="plot pts" id="co-b" viewBox="0 0 400 320"></svg></div>
+      </div>
+      <p class="hov" id="co-hov">Hover a point to see it in both views.</p>
+      <div class="two" style="margin-top:6px">
+        <div class="readout" id="co-stats" style="margin-top:0"></div>
+        <div><p class="cap">test accuracy vs round</p><svg class="plot" id="co-curve" viewBox="0 0 440 220"></svg>
+          <div class="keyrow"><span><i style="background:var(--c3)"></i>f₁ (view 1)</span><span><i style="background:var(--c5)"></i>f₂ (view 2)</span><span><i style="background:var(--mi)"></i>both</span></div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h4>Tri-training: three bootstrap models, two-teach-one</h4>
+      <p class="hint">Four labeled points per class, bootstrapped three times, so each model sees a different multiset (large marks; a ×2 means a point was drawn twice). Each round, model k gets every unlabeled point on which the other two agree (hollow marks), then all three retrain. The book's rule uses τ = 0.5. Raising τ also requires both teachers to be at least τ sure.</p>
+      <div class="ctrl"><label for="tri-tau">teachers' confidence τ</label><input type="range" id="tri-tau" min="0.5" max="0.99" step="0.01" value="0.9"><output id="tri-tau-o"></output></div>
+      <div class="btns"><button class="b pri" id="tri-step">Round</button><button class="b" id="tri-reset">Back to round 0</button><button class="b" id="tri-new">New bootstrap</button></div>
+      <div class="three" style="margin-top:12px">
+        <div><p class="trihead"><span>model 1</span><span id="tri-a0"></span></p><svg class="plot" id="tri-0" viewBox="0 0 300 220"></svg></div>
+        <div><p class="trihead"><span>model 2</span><span id="tri-a1"></span></p><svg class="plot" id="tri-1" viewBox="0 0 300 220"></svg></div>
+        <div><p class="trihead"><span>model 3</span><span id="tri-a2"></span></p><svg class="plot" id="tri-2" viewBox="0 0 300 220"></svg></div>
+      </div>
+      <div class="readout" id="tri-stats"></div>
+      <p class="verdict" id="tri-say" style="font-size:17px"></p>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Why conditional independence matters</h3>
+    <div class="mathcard">
+      <h4>Co-training's assumption, in one line</h4>
+      <ol class="steps">
+        <li><div>Each example is \(\mathbf x=(\mathbf x^{(1)},\mathbf x^{(2)})\), and each view is sufficient: there are \(f_1,f_2\) with \(f_1(\mathbf x^{(1)})=f_2(\mathbf x^{(2)})=y\) (approximately).</div></li>
+        <li><div>Conditional independence: \(p(\mathbf x^{(1)},\mathbf x^{(2)}\mid y)=p(\mathbf x^{(1)}\mid y)\,p(\mathbf x^{(2)}\mid y)\).</div></li>
+        <li><div>Model 1 selects points by looking at \(\mathbf x^{(1)}\) only. Under (2), given the class, their \(\mathbf x^{(2)}\) values are still a <b>random draw</b> from \(p(\mathbf x^{(2)}\mid y)\). Model 2 receives fresh, unbiased examples, including ones that are hard in view 2.</div></li>
+        <li><div>If instead \(\mathbf x^{(2)}\approx g(\mathbf x^{(1)})\), the points model 1 is sure about are the ones model 2 is <b>also</b> sure about. The "confident in one, unsure in the other" set is tiny and full of mistakes.</div></li>
+        <li><div>Combining at test time: with independent views, \(\log\frac{p(B\mid\mathbf x)}{p(A\mid\mathbf x)}\approx\log\frac{p(B\mid\mathbf x^{(1)})}{p(A\mid\mathbf x^{(1)})}+\log\frac{p(B\mid\mathbf x^{(2)})}{p(A\mid\mathbf x^{(2)})}-\log\frac{p(B)}{p(A)}\). <span class="why">Naive Bayes over views. The demo has balanced classes, so the last term is 0.</span></div></li>
+      </ol>
+      <h4>Tri-training as a selection metric</h4>
+      <ol class="steps">
+        <li><div>Bootstrap: \(\mathcal D_L^{(k)}\) = \(N_L\) draws with replacement from \(\mathcal D_L\), for \(k=1,2,3\). Fit \(f_k\) on each.</div></li>
+        <li><div>For each \(k\) and \(\mathbf x\in\mathcal D_U\): if \(f_i(\mathbf x)=f_j(\mathbf x)\) for the other two models \(i,j\), add \((\mathbf x,f_i(\mathbf x))\) to \(S_k\).</div></li>
+        <li><div>Refit \(f_k\) on \(\mathcal D_L^{(k)}\cup S_k\), and repeat. If \(f_i\) and \(f_j\) make independent errors at rate \(e\), then wrong agreements occur at rate about \(e^2\), which is why agreement is a decent filter. Their errors become correlated as the models converge.</div></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Co-training and tri-training</h3><div class="quizbox" data-quiz="co"></div></div>
+</section>
+
+<!-- ============ 19.3.4 ============ -->
+<section class="sec" id="lp">
+  <div class="sec-head"><span class="secnum">§19.3.4</span><h2>Label propagation on graphs: let labels flow to similar points</h2></div>
+  <div class="intro">
+    <p>The <b>manifold assumption</b>: if two points are similar, they probably share a label. Build a graph whose nodes are all \(M\) labeled and \(N\) unlabeled examples, with edge weights \(w_{ij}\ge0\) measuring similarity. Then let the known labels <b>propagate</b> along the edges until neighboring nodes disagree as little as possible [ZG02].</p>
+    <p>\[ T_{ij}=\frac{w_{ij}}{\sum_kw_{kj}}\quad(19.26),\qquad \text{repeat:}\quad \mathbf Y\leftarrow\mathbf T\mathbf Y,\quad Y_{ic}\leftarrow\frac{Y_{ic}}{\sum_kY_{ik}},\quad \text{reset labeled rows to one-hot.} \]</p>
+    <p>Here \(\mathbf Y\) is the \((M+N)\times C\) matrix of class distributions. This converges to a single fixed point, and finding it directly costs one inversion of the unlabeled-to-unlabeled transition matrix. Label propagation is <b>transductive</b>: it labels this particular \(\mathcal D_U\). Train any classifier on the result to get an <b>inductive</b> model.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">Think of the dots as tied together by strings, short strings between close dots.</p>
+        <p>Drip red ink on one dot and blue ink on another. The ink seeps along the strings to nearby dots, and it travels best along short, strong strings. Dots you colored on purpose keep their color no matter what.</p>
+        <p>After a while every dot is mostly red or mostly blue, depending on which ink reached it more easily. Along a curvy path of dots, the ink follows the curve. It doesn't jump across a gap, because there are no strings across the gap.</p>
+      </div>
+      <div data-l="2">
+        <p>Each point starts with a "color mix" (how much it thinks it's class A and how much class B). The labeled points are pure colors. Unlabeled ones start at 50/50.</p>
+        <p>One step: every unlabeled point replaces its mix with a <b>weighted average of its neighbors' mixes</b>, where closer neighbors count more. Labeled points get reset to their true color. Repeat until nothing changes.</p>
+        <p>The answer depends on which points count as neighbors. Each point connects to its <b>k</b> nearest points, with weight \(e^{-d^2/2\sigma^2}\). Small k follows each moon. On Moons, raise k to about 16 and edges start to cross the gap, so color leaks into the other moon. Then try "noisy moons," where the two classes touch.</p>
+      </div>
+      <div data-l="3">
+        <p>The algorithm, as in the book:</p>
+        <ol>
+          <li>\(T_{ij}=w_{ij}/\sum_kw_{kj}\): the probability of propagating node \(j\)'s label to node \(i\).</li>
+          <li>\(\mathbf Y\leftarrow\mathbf T\mathbf Y\), then renormalize each row to sum to 1.</li>
+          <li>Clamp: \(Y_{ic}=\mathbb I(y_i=c)\) for labeled \(i\).</li>
+          <li>Repeat until \(\mathbf Y\) stops changing, then predict \(\hat y_i=\arg\max_cY_{ic}\).</li>
+        </ol>
+        <p>Since rows of \(\mathbf Y\) sum to 1, steps 2–3 equal \(\mathbf Y\leftarrow\bar{\mathbf T}\mathbf Y\) with \(\bar{\mathbf T}\) the <b>row-normalized</b> \(\mathbf T\). Splitting into labeled (L) and unlabeled (U) blocks, the fixed point solves \(\mathbf Y_U=\bar{\mathbf T}_{UU}\mathbf Y_U+\bar{\mathbf T}_{UL}\mathbf Y_L\), so \(\mathbf Y_U=(\mathbf I-\bar{\mathbf T}_{UU})^{-1}\bar{\mathbf T}_{UL}\mathbf Y_L\). The "Jump to fixed point" button computes exactly this.</p>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Random-walk view.</b> \(\bar{\mathbf T}\) is row-stochastic. Make labeled nodes absorbing. Then \(Y_{ic}\) at the fixed point is the probability that a walk started at \(i\) is first absorbed at a class-\(c\) labeled node. Uniqueness needs every unlabeled component to reach a labeled node, which makes \(\mathbf I-\bar{\mathbf T}_{UU}\) invertible.</li>
+          <li><b>Harmonic functions.</b> With the row-normalized \(\mathbf P=\mathbf D^{-1}\mathbf W\) instead, the fixed point is the harmonic solution of Zhu, Ghahramani &amp; Lafferty (2003). It minimizes the Laplacian energy \(\tfrac12\sum_{ij}w_{ij}(f_i-f_j)^2=\mathbf f^\top\mathbf L\mathbf f\) subject to the clamped labels, and each \(f_i\) is the weighted mean of its neighbors. \(\bar{\mathbf T}\) and \(\mathbf P\) agree when all column sums of \(\mathbf W\) are equal.</li>
+          <li><b>Variants.</b> Zhou et al. (2004), "local and global consistency," use \(\mathbf S=\mathbf D^{-1/2}\mathbf W\mathbf D^{-1/2}\) and soft clamping, \(\mathbf F=(1-\alpha)(\mathbf I-\alpha\mathbf S)^{-1}\mathbf Y\), which tolerates label noise. GCNs (Kipf &amp; Welling 2017) learn features while propagating.</li>
+          <li><b>Similarity is everything.</b> In high dimensions Euclidean distance is a poor proxy for "same class." Iscen et al. (2019) build the kNN graph on a CNN's embeddings, propagate, train on the result with per-sample certainty weights, and repeat [BRR18; Isc+19].</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Propagate labels across a kNN graph</h3>
+    <div class="panel">
+      <h4>Y ← TY, renormalize, clamp, repeat</h4>
+      <p class="hint">240 points, one labeled point per class to start. Node color mixes the class colors by \(Y_{iB}\). <b>Click a node</b> to cycle it through unlabeled → A → B → unlabeled, and try labeling something wrong. Hover a node to see the neighbors it averages.</p>
+      <div class="btns" style="margin-top:0">
+        <div class="seg" id="lp-data"><button data-v="moons" class="on">Moons</button><button data-v="noisy">Noisy moons</button><button data-v="circles">Circles</button></div>
+        <label class="chk"><input type="checkbox" id="lp-edges" checked> edges</label>
+        <label class="chk"><input type="checkbox" id="lp-ind"> inductive: fit a classifier to Y</label>
+      </div>
+      <div class="ctrl"><label for="lp-k">k neighbors</label><input type="range" id="lp-k" min="2" max="30" step="1" value="8"><output id="lp-k-o"></output></div>
+      <div class="ctrl"><label for="lp-s">kernel width σ</label><input type="range" id="lp-s" min="0.05" max="1" step="0.01" value="0.2"><output id="lp-s-o"></output></div>
+      <div class="btns">
+        <button class="b pri" id="lp-step">Step</button><button class="b" id="lp-10">+10</button><button class="b" id="lp-run">Run</button><button class="b" id="lp-jump">Jump to fixed point</button><button class="b" id="lp-reset">Reset Y</button>
+      </div>
+      <div class="two" style="margin-top:14px">
+        <div><p class="cap" id="lp-cap">graph and Y</p><svg class="plot pts" id="lp-plot" viewBox="0 0 520 360"></svg>
+          <p class="hov" id="lp-hov">Hover a node.</p></div>
+        <div><p class="cap">distance to the fixed point, max |Y − Y*| (log scale)</p><svg class="plot" id="lp-conv" viewBox="0 0 440 240"></svg>
+          <div class="keyrow"><span><i style="background:var(--mi)"></i>iterative Y</span><span><i class="c" style="background:var(--muted)"></i>Y* from the closed form</span></div>
+          <div class="readout" id="lp-stats"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Equation 19.26 and the fixed point</h3>
+    <div class="mathcard">
+      <h4>From the iteration to one linear solve</h4>
+      <ol class="steps">
+        <li><div>Weights: here \(w_{ij}=\exp(-\|\mathbf x_i-\mathbf x_j\|^2/2\sigma^2)\) if \(j\) is among \(i\)'s \(k\) nearest neighbors or vice versa, and 0 otherwise. <span class="why">Any non-negative similarity works [Zhu05, ch. 3].</span></div></li>
+        <li><div>\(T_{ij}=w_{ij}/\sum_kw_{kj}\): column \(j\) of \(\mathbf T\) sums to 1, so it splits node \(j\)'s label among its neighbors. <span class="why">(19.26)</span></div></li>
+        <li><div>Propagate: \((\mathbf T\mathbf Y)_i=\sum_jT_{ij}\mathbf Y_j\). If every row of \(\mathbf Y\) sums to 1, this row sums to \(\sum_jT_{ij}\), and renormalizing gives \(\sum_j\bar T_{ij}\mathbf Y_j\) with \(\bar T_{ij}=T_{ij}/\sum_lT_{il}\). <span class="why">So the renormalization step just uses the row-normalized \(\bar{\mathbf T}\).</span></div></li>
+        <li><div>Clamp the labeled rows. In block form: \(\mathbf Y_U\leftarrow\bar{\mathbf T}_{UU}\mathbf Y_U+\bar{\mathbf T}_{UL}\mathbf Y_L\).</div></li>
+        <li><div>Fixed point: \(\mathbf Y_U=(\mathbf I-\bar{\mathbf T}_{UU})^{-1}\bar{\mathbf T}_{UL}\mathbf Y_L\). It exists and is unique when every unlabeled node has a path to a labeled one. Then \(\bar{\mathbf T}_{UU}\) has spectral radius below 1 and the iteration converges geometrically at that rate. <span class="why">That is why far-away nodes take hundreds of steps.</span></div></li>
+        <li><div>Cost: solving an \(N\times N\) system is \(O(N^3)\) if dense, cheaper with sparse kNN graphs and iterative solvers. Predict \(\hat y_i=\arg\max_cY_{ic}\).</div></li>
+      </ol>
+      <div class="note">Transductive: you get labels only for the nodes in the graph. A new test point needs either a new graph or an inductive classifier trained on the propagated labels. The "inductive" checkbox fits RBF logistic regression to the soft labels \(Y_{iB}\).</div>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Label propagation</h3><div class="quizbox" data-quiz="lp"></div></div>
+</section>
+
+<section class="sec" id="cheat">
+  <div class="sec-head"><span class="secnum">—</span><h2>Cheat sheet</h2></div>
+  <div class="block">
+    <div class="panel scroll">
+      <table class="vs">
+        <thead><tr><th></th><th>In words</th><th>In symbols</th></tr></thead>
+        <tbody>
+          <tr><th>Setting (19.3)</th><td>Few labeled pairs, many unlabeled inputs.</td><td>\(\mathcal D_L\sim p(\mathbf x,y),\ \mathcal D_U\sim p(\mathbf x),\ N_U\gg N_L\)</td></tr>
+          <tr><th>Cluster assumption</th><td>Boundaries belong in low-density regions.</td><td>\(p(\mathbf x)\) small where \(p(y\mid\mathbf x)\) changes</td></tr>
+          <tr><th>Manifold assumption</th><td>Similar points share labels.</td><td>\(w_{ij}\) large \(\Rightarrow y_i=y_j\) likely</td></tr>
+          <tr><th>Pseudo-label</th><td>The model's own prediction used as a label.</td><td>\(\hat y=\arg\max_cp_\theta(y=c\mid\mathbf x)\)</td></tr>
+          <tr><th>Selection metric</th><td>Keep only confident pseudo-labels.</td><td>\(\max_cp_\theta(y=c\mid\mathbf x)\ge\tau\)</td></tr>
+          <tr><th>Offline vs online</th><td>Relabel everything after convergence (stale labels) vs relabel each batch (more compute).</td><td>—</td></tr>
+          <tr><th>Confirmation bias</th><td>Training on your own mistakes locks them in.</td><td>[TV17]</td></tr>
+          <tr><th>Online self-training (19.16)</th><td>Cross-entropy with a hard target.</td><td>\(-\max_c\log p_\theta(y=c\mid\mathbf x)\)</td></tr>
+          <tr><th>Entropy min. (19.17)</th><td>Cross-entropy with a soft target \(p\) itself.</td><td>\(-\sum_cp_c\log p_c\)</td></tr>
+          <tr><th>Sharpening</th><td>T = 1: entropy min. T → 0: self-training.</td><td>\(q_c\propto p_c^{1/T}\)</td></tr>
+          <tr><th>Why it works</th><td>Smooth model + boundary in a cluster ⇒ many uncertain points.</td><td>\(\mathbb E_U[H]\approx\) density near boundary</td></tr>
+          <tr><th>Degenerate solution</th><td>Boundary off the data: everyone confident, one class.</td><td>prevented by \(\mathcal D_L\), \(H(\bar p)\)</td></tr>
+          <tr><th>Mutual information (19.25)</th><td>Confident per point, balanced overall.</td><td>\(-I=\mathbb E[H(p)]-H(\bar p)\)</td></tr>
+          <tr><th>Co-training</th><td>Two sufficient, conditionally independent views teach each other.</td><td>confident in one, unsure in other ⇒ transfer</td></tr>
+          <tr><th>Tri-training</th><td>Three bootstrap models; two agree ⇒ label for the third.</td><td>\(f_i(\mathbf x)=f_j(\mathbf x)\Rightarrow(\mathbf x,f_i(\mathbf x))\to S_k\)</td></tr>
+          <tr><th>Transition matrix (19.26)</th><td>Column-normalized similarities.</td><td>\(T_{ij}=w_{ij}/\sum_kw_{kj}\)</td></tr>
+          <tr><th>Propagation step</th><td>Average neighbors, renormalize, clamp labels.</td><td>\(\mathbf Y\leftarrow\mathbf T\mathbf Y\), rows → 1, \(\mathbf Y_L\) fixed</td></tr>
+          <tr><th>Fixed point</th><td>One linear solve over the unlabeled block.</td><td>\(\mathbf Y_U=(\mathbf I-\bar{\mathbf T}_{UU})^{-1}\bar{\mathbf T}_{UL}\mathbf Y_L\)</td></tr>
+          <tr><th>Transductive vs inductive</th><td>Labels for this \(\mathcal D_U\) only vs a model \(f\) for any \(\mathbf x\).</td><td>train \(f\) on propagated labels</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <footer>Built as a study companion for Murphy, <i>Probabilistic Machine Learning: An Introduction</i> (MIT Press, CC-BY-NC-ND), §19.3–19.3.4 (co-authored with Colin Raffel). All data on this page are synthetic and generated in the page from fixed seeds. The classifiers are logistic regressions on RBF features (fit by Newton's method) or on raw 2-D features, and every model, graph and fixed point is computed live in your browser.</footer>
+</section>
+</main>
+</div>
+<script>
+(function () {
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function txt(parent, x, y, s, cls, extra) { const t = el('text', Object.assign({ x, y, class: cls || 'ax' }, extra || {}), parent); t.textContent = s; return t; }
+const lin = (d0, d1, r0, r1) => v => r0 + (v - d0) / (d1 - d0) * (r1 - r0);
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const neg = s => String(s).replace(/^-/, '−');
+const f1 = v => neg(v.toFixed(1)), f2 = v => neg((Math.abs(v) < 5e-3 ? 0 : v).toFixed(2)), f3 = v => neg((Math.abs(v) < 5e-4 ? 0 : v).toFixed(3));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pathOf = pts => pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ',' + p[1].toFixed(1)).join('');
+const svgPt = (svg, evt) => { const p = svg.createSVGPoint(); p.x = evt.clientX; p.y = evt.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); };
+const hexRgb = h => { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
+const renderers = [];
+const pct = v => (100 * v).toFixed(1) + '%';
+const range = n => Array.from({ length: n }, (_, i) => i);
+const SUB = ['₁', '₂', '₃'];
+
+function frame(o) {
+  const L = o.l, R = o.W - o.r, T = o.t, B = o.H - o.b;
+  return { L, R, T, B, X: lin(o.x[0], o.x[1], L, R), Y: lin(o.y[0], o.y[1], B, T), iX: lin(L, R, o.x[0], o.x[1]), iY: lin(B, T, o.y[0], o.y[1]), dom: [o.x[0], o.x[1], o.y[0], o.y[1]] };
+}
+const fmtT = v => neg(String(+(+v).toFixed(3)));
+function axes(svg, f, o) {
+  (o.xt || []).forEach(v => { el('line', { x1: f.X(v), x2: f.X(v), y1: f.T, y2: f.B, class: 'gridl' }, svg); txt(svg, f.X(v), f.B + 15, (o.fx || fmtT)(v), 'ax', { 'text-anchor': 'middle' }); });
+  (o.yt || []).forEach(v => { el('line', { x1: f.L, x2: f.R, y1: f.Y(v), y2: f.Y(v), class: 'gridl' }, svg); txt(svg, f.L - 6, f.Y(v) + 4, (o.fy || fmtT)(v), 'ax', { 'text-anchor': 'end' }); });
+  el('line', { x1: f.L, x2: f.R, y1: f.B, y2: f.B, class: 'base' }, svg);
+  el('line', { x1: f.L, x2: f.L, y1: f.T, y2: f.B, class: 'base' }, svg);
+  if (o.xl) txt(svg, (f.L + f.R) / 2, f.B + 31, o.xl, 'axl', { 'text-anchor': 'middle' });
+  if (o.yl) txt(svg, f.L - 36, (f.T + f.B) / 2, o.yl, 'axl', { 'text-anchor': 'middle', transform: `rotate(-90 ${f.L - 36} ${(f.T + f.B) / 2})` });
+}
+function niceCeil(v) { const e = 10 ** Math.floor(Math.log10(v)); for (const m of [1, 2, 2.5, 5, 10]) if (m * e >= v - 1e-12) return m * e; return 10 * e; }
+function ticksAB(a, b, n) {
+  const s = niceCeil((b - a) / (n || 4)), out = [];
+  for (let v = Math.ceil(a / s - 1e-9) * s; v <= b + 1e-9; v += s) out.push(+v.toFixed(6));
+  return out;
+}
+let CLIPN = 0;
+function clip(svg, f) {
+  const id = 'cp' + (CLIPN++);
+  const cp = el('clipPath', { id }, el('defs', {}, svg));
+  el('rect', { x: f.L, y: f.T, width: f.R - f.L, height: f.B - f.T }, cp);
+  return el('g', { 'clip-path': `url(#${id})` }, svg);
+}
+function raster(svg, f, gw, gh, fill) {
+  const cv = document.createElement('canvas'); cv.width = gw; cv.height = gh;
+  const ctx = cv.getContext('2d'), im = ctx.createImageData(gw, gh);
+  for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+    const c = fill(i, gh - 1 - j), k = 4 * (j * gw + i);
+    if (!c) continue;
+    im.data[k] = c[0]; im.data[k + 1] = c[1]; im.data[k + 2] = c[2]; im.data[k + 3] = Math.round(255 * (c[3] == null ? 1 : c[3]));
+  }
+  ctx.putImageData(im, 0, 0);
+  return el('image', { x: f.L, y: f.T, width: f.R - f.L, height: f.B - f.T, href: cv.toDataURL(), preserveAspectRatio: 'none' }, svg);
+}
+function onDrag(svg, down, move, up) {
+  let active = false;
+  svg.addEventListener('pointerdown', e => { if (e.button > 0) return; const r = down(svgPt(svg, e), e); if (r === false) return; active = true; svg.setPointerCapture(e.pointerId); e.preventDefault(); });
+  svg.addEventListener('pointermove', e => { if (active) move(svgPt(svg, e), e); });
+  const end = () => { if (active) { active = false; if (up) up(); } };
+  svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+}
+function slider(id, fmt, cb) {
+  const s = $('#' + id), o = $('#' + id + '-o');
+  const go = () => { o.textContent = fmt(+s.value); if (cb) cb(+s.value); };
+  s.addEventListener('input', go); o.textContent = fmt(+s.value);
+  return { get v() { return +s.value; }, set(v) { s.value = v; o.textContent = fmt(+s.value); }, el: s };
+}
+function segm(id, cb) {
+  const s = $('#' + id);
+  s.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; $$('button', s).forEach(x => x.classList.toggle('on', x === b)); cb(b.dataset.v, b); });
+}
+function segSet(id, val) { $$('#' + id + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === val)); }
+
+/* class marks: 0 = circle (c0), 1 = square (c1), 2 = triangle (c2) */
+const CLS = ['--c0', '--c1', '--c2'];
+function mark(g, x, y, c, r, extra) {
+  r = r || 4.6; const fill = `var(${CLS[c]})`, a = Object.assign({ fill, stroke: 'var(--surface)', 'stroke-width': 1.3 }, extra || {});
+  if (c === 0) return el('circle', Object.assign({ cx: x, cy: y, r }, a), g);
+  if (c === 1) return el('rect', Object.assign({ x: x - r * .88, y: y - r * .88, width: r * 1.76, height: r * 1.76, rx: 1 }, a), g);
+  return el('path', Object.assign({ d: `M${x},${y - r * 1.15}L${x + r * 1.05},${y + r * .75}L${x - r * 1.05},${y + r * .75}Z` }, a), g);
+}
+function ring(g, x, y, r, col) { return el('circle', { cx: x, cy: y, r: r || 9, fill: 'none', stroke: col || 'var(--ink)', 'stroke-width': 1.7 }, g); }
+function star(g, x, y, r) {
+  const p = []; for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, q = k % 2 ? r * .45 : r; p.push([x + q * Math.cos(a), y + q * Math.sin(a)]); }
+  el('path', { d: pathOf(p) + 'Z', fill: 'var(--red)', stroke: 'var(--surface)', 'stroke-width': 1.2 }, g);
+}
+function cross(g, x, y, s) {
+  s = s || 7; const d = `M${x - s},${y - s}L${x + s},${y + s}M${x - s},${y + s}L${x + s},${y - s}`;
+  el('path', { d, stroke: 'var(--surface)', 'stroke-width': 7, 'stroke-linecap': 'round' }, g);
+  el('path', { d, stroke: 'var(--ink)', 'stroke-width': 3, 'stroke-linecap': 'round' }, g);
+}
+
+
+/* ---------- small drawing helpers for this lab ---------- */
+function poly(g, pts, col, w, extra) { return el('path', Object.assign({ d: pathOf(pts), fill: 'none', stroke: col, 'stroke-width': w || 2, 'stroke-linejoin': 'round' }, extra || {}), g); }
+function clear(svg) { while (svg.firstChild) svg.removeChild(svg.firstChild); }
+const f4 = v => neg(v.toFixed(4));
+function soft(name, a) { const c = hexRgb(cssv(name)); return [c[0], c[1], c[2], a]; }
+function whenSeen(node, cb) {
+  if (!('IntersectionObserver' in window)) { cb(); return; }
+  const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); cb(); } }, { rootMargin: '200px' });
+  io.observe(node);
+}
+
+/* ---------- small stats ---------- */
+const mean = a => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i]; return a.length ? s / a.length : 0; };
+const median = a => { if (!a.length) return 0; const s = Float64Array.from(a).sort(), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; };
+const quant = (a, q) => { const s = Float64Array.from(a).sort(); return s[clamp(Math.floor(q * (s.length - 1)), 0, s.length - 1)]; };
+const HD = 0.5;
+const stat = (k, v, c) => `<div class="stat ${c || ''}"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+function golden(fn, a, b) {
+  const gr = (Math.sqrt(5) - 1) / 2; let c = b - gr * (b - a), d = a + gr * (b - a), fc = fn(c), fd = fn(d);
+  for (let k = 0; k < 90; k++) { if (fc < fd) { b = d; d = c; fd = fc; c = b - gr * (b - a); fc = fn(c); } else { a = c; c = d; fc = fd; d = a + gr * (b - a); fd = fn(d); } }
+  return (a + b) / 2;
+}
+function runner(btn, label, step, getM, target, draw, per) {
+  let anim = 0;
+  const stop = () => { if (anim) cancelAnimationFrame(anim); anim = 0; btn.textContent = label; };
+  btn.addEventListener('click', () => {
+    if (anim) { stop(); return; }
+    btn.textContent = 'Pause';
+    const tick = () => { for (let k = 0; k < per && getM() < target(); k++) step(); draw(); if (getM() < target()) anim = requestAnimationFrame(tick); else stop(); };
+    anim = requestAnimationFrame(tick);
+  });
+  return stop;
+}
+
+
+/*CORE-START*/
+/* ---------- random ---------- */
+function rng(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gauss(r) { let u = 0; while (!u) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); }
+const sigm = z => z >= 0 ? 1 / (1 + Math.exp(-z)) : Math.exp(z) / (1 + Math.exp(z));
+const softplus = z => z > 0 ? z + Math.log1p(Math.exp(-z)) : Math.log1p(Math.exp(z));
+const H2 = p => (p <= 1e-12 || p >= 1 - 1e-12) ? 0 : -(p * Math.log(p) + (1 - p) * Math.log(1 - p));
+function shuffleIdx(n, r) { const ix = Array.from({ length: n }, (_, i) => i); for (let j = n - 1; j > 0; j--) { const k = Math.floor(r() * (j + 1)); [ix[j], ix[k]] = [ix[k], ix[j]]; } return ix; }
+
+/* ---------- data sets: {X: [[x,y]], y: [0|1], dom: [x0,x1,y0,y1]} ---------- */
+function moons(n, noise, seed) {
+  const r = rng(seed), X = [], y = [];
+  for (let i = 0; i < n; i++) {
+    const c = i % 2, t = Math.PI * r();
+    const p = c === 0 ? [Math.cos(t), Math.sin(t)] : [1 - Math.cos(t), 0.5 - Math.sin(t)];
+    X.push([p[0] + noise * gauss(r), p[1] + noise * gauss(r)]); y.push(c);
+  }
+  return { X, y, dom: [-1.6, 2.6, -1.1, 1.6] };
+}
+function circles(n, noise, seed) {
+  const r = rng(seed), X = [], y = [];
+  for (let i = 0; i < n; i++) {
+    const c = i % 2, t = 2 * Math.PI * r(), R = c === 0 ? 1 : 0.42;
+    X.push([R * Math.cos(t) + noise * gauss(r), R * Math.sin(t) + noise * gauss(r)]); y.push(c);
+  }
+  return { X, y, dom: [-1.6, 1.6, -1.45, 1.45] };
+}
+
+/* ---------- RBF logistic regression (the "model" in most demos) ---------- */
+function rbfSpec(dom, nx, ny, wfac) {
+  const C = [];
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) C.push([dom[0] + (i + .5) * (dom[1] - dom[0]) / nx, dom[2] + (j + .5) * (dom[3] - dom[2]) / ny]);
+  const h = Math.max((dom[1] - dom[0]) / nx, (dom[3] - dom[2]) / ny) * (wfac || 1);
+  return { C, g: 1 / (2 * h * h), K: C.length + 1 };
+}
+function feat(S, x, y) {
+  const f = new Float64Array(S.K); f[0] = 1;
+  for (let k = 0; k < S.C.length; k++) { const dx = x - S.C[k][0], dy = y - S.C[k][1]; f[k + 1] = Math.exp(-S.g * (dx * dx + dy * dy)); }
+  return f;
+}
+const dot = (w, f) => { let s = 0; for (let k = 0; k < w.length; k++) s += w[k] * f[k]; return s; };
+function cholSolve(A, b, n) {
+  const L = new Float64Array(n * n);
+  for (let i = 0; i < n; i++) for (let j = 0; j <= i; j++) {
+    let s = A[i * n + j]; for (let k = 0; k < j; k++) s -= L[i * n + k] * L[j * n + k];
+    if (i === j) L[i * n + i] = Math.sqrt(Math.max(s, 1e-12)); else L[i * n + j] = s / L[j * n + j];
+  }
+  const z = new Float64Array(n);
+  for (let i = 0; i < n; i++) { let s = b[i]; for (let k = 0; k < i; k++) s -= L[i * n + k] * z[k]; z[i] = s / L[i * n + i]; }
+  for (let i = n - 1; i >= 0; i--) { let s = z[i]; for (let k = i + 1; k < n; k++) s -= L[k * n + i] * z[k]; z[i] = s / L[i * n + i]; }
+  return z;
+}
+/* Newton / IRLS. F: array of feature vectors, t: targets in [0,1], c: weights. */
+function fitLogit(F, t, c, lam, w0) {
+  const K = F[0] ? F[0].length : 1, n = F.length;
+  let w = w0 ? Float64Array.from(w0) : new Float64Array(K);
+  const loss = w => { let s = 0; for (let i = 0; i < n; i++) { const z = dot(w, F[i]); s += c[i] * (softplus(z) - t[i] * z); } for (let k = 1; k < K; k++) s += .5 * lam * w[k] * w[k]; return s + .5 * 1e-4 * w[0] * w[0]; };
+  let Lc = loss(w);
+  for (let it = 0; it < 30; it++) {
+    const Hm = new Float64Array(K * K), g = new Float64Array(K);
+    for (let i = 0; i < n; i++) {
+      const f = F[i], p = sigm(dot(w, f)), a = c[i] * (p - t[i]), h = c[i] * Math.max(p * (1 - p), 1e-6);
+      for (let k = 0; k < K; k++) { if (!f[k]) continue; g[k] += a * f[k]; const hf = h * f[k]; for (let l = 0; l <= k; l++) Hm[k * K + l] += hf * f[l]; }
+    }
+    for (let k = 0; k < K; k++) for (let l = 0; l < k; l++) Hm[l * K + k] = Hm[k * K + l];
+    for (let k = 1; k < K; k++) { Hm[k * K + k] += lam; g[k] += lam * w[k]; }
+    Hm[0] += 1e-4; g[0] += 1e-4 * w[0];
+    const d = cholSolve(Hm, g, K);
+    let step = 1, wn, Ln;
+    for (let s = 0; s < 12; s++) { wn = w.map((v, k) => v - step * d[k]); Ln = loss(wn); if (Ln <= Lc + 1e-10) break; step /= 2; }
+    const dec = Lc - Ln; w = wn; Lc = Ln;
+    if (dec < 1e-7 * (1 + Math.abs(Lc))) break;
+  }
+  return w;
+}
+const accOf = (pred, y) => { let s = 0; for (let i = 0; i < y.length; i++) s += (pred[i] >= .5 ? 1 : 0) === y[i]; return s / y.length; };
+
+/* ---------- label propagation ---------- */
+function knnGraph(X, k, sigma) {
+  const n = X.length, W = Array.from({ length: n }, () => new Map());
+  for (let i = 0; i < n; i++) {
+    const d = [];
+    for (let j = 0; j < n; j++) if (j !== i) { const dx = X[i][0] - X[j][0], dy = X[i][1] - X[j][1]; d.push([dx * dx + dy * dy, j]); }
+    d.sort((a, b) => a[0] - b[0]);
+    for (let m = 0; m < k; m++) { const [d2, j] = d[m], w = Math.exp(-d2 / (2 * sigma * sigma)); W[i].set(j, w); W[j].set(i, Math.max(w, W[j].get(j) || 0)); }
+  }
+  for (let i = 0; i < n; i++) for (const [j, w] of W[i]) { const o = W[j].get(i) || 0; if (o !== w) { const m = Math.max(o, w); W[i].set(j, m); W[j].set(i, m); } }
+  return W;
+}
+/* book: T_ij = w_ij / sum_k w_kj (column-normalized), Y <- T Y, renormalize rows, clamp labeled */
+function lpInit(n, C, labels) { const Y = Array.from({ length: n }, () => new Float64Array(C).fill(1 / C)); labels.forEach((c, i) => { if (c >= 0) { Y[i].fill(0); Y[i][c] = 1; } }); return Y; }
+function lpStep(W, colSum, Y, labels, C) {
+  const n = Y.length, Yn = Array.from({ length: n }, () => new Float64Array(C));
+  let dmax = 0;
+  for (let i = 0; i < n; i++) {
+    if (labels[i] >= 0) { Yn[i][labels[i]] = 1; continue; }
+    let s = 0;
+    for (const [j, w] of W[i]) { const t = w / colSum[j]; for (let c = 0; c < C; c++) Yn[i][c] += t * Y[j][c]; }
+    for (let c = 0; c < C; c++) s += Yn[i][c];
+    for (let c = 0; c < C; c++) { Yn[i][c] = s > 0 ? Yn[i][c] / s : 1 / C; dmax = Math.max(dmax, Math.abs(Yn[i][c] - Y[i][c])); }
+  }
+  return { Y: Yn, dmax };
+}
+function colSums(W) { return W.map(m => { let s = 0; for (const v of m.values()) s += v; return s; }); }
+/* closed form with the row-normalized T̄: Y_U = (I − T̄_UU)^{-1} T̄_UL Y_L, solved by Gaussian elimination */
+function lpClosed(W, colSum, labels, C) {
+  const n = W.length, U = [], pos = new Int32Array(n).fill(-1);
+  for (let i = 0; i < n; i++) if (labels[i] < 0) { pos[i] = U.length; U.push(i); }
+  const m = U.length, A = new Float64Array(m * m), B = Array.from({ length: m }, () => new Float64Array(C));
+  U.forEach((i, a) => {
+    let rs = 0; for (const [j, w] of W[i]) rs += w / colSum[j];
+    A[a * m + a] = 1;
+    for (const [j, w] of W[i]) { const t = w / colSum[j] / (rs || 1); if (labels[j] >= 0) B[a][labels[j]] += t; else A[a * m + pos[j]] -= t; }
+  });
+  for (let k = 0; k < m; k++) {
+    let p = k; for (let r = k + 1; r < m; r++) if (Math.abs(A[r * m + k]) > Math.abs(A[p * m + k])) p = r;
+    if (p !== k) { for (let c = 0; c < m; c++) { const t = A[k * m + c]; A[k * m + c] = A[p * m + c]; A[p * m + c] = t; } const t = B[k]; B[k] = B[p]; B[p] = t; }
+    const d = A[k * m + k]; if (Math.abs(d) < 1e-14) continue;
+    for (let r = k + 1; r < m; r++) { const f = A[r * m + k] / d; if (!f) continue; for (let c = k; c < m; c++) A[r * m + c] -= f * A[k * m + c]; for (let c = 0; c < C; c++) B[r][c] -= f * B[k][c]; }
+  }
+  const Z = Array.from({ length: m }, () => new Float64Array(C));
+  for (let k = m - 1; k >= 0; k--) { for (let c = 0; c < C; c++) { let s = B[k][c]; for (let r = k + 1; r < m; r++) s -= A[k * m + r] * Z[r][c]; Z[k][c] = Math.abs(A[k * m + k]) < 1e-14 ? 1 / C : s / A[k * m + k]; } }
+  const Y = lpInit(n, C, labels); U.forEach((i, a) => { Y[i] = Z[a]; });
+  return Y;
+}
+/*CORE-END*/
+
+/* ================= shared 2-D plotting for this lab ================= */
+const LAM = 0.03;
+function plot2(svg, dom, pad) {
+  const vb = svg.viewBox.baseVal; pad = pad == null ? 8 : pad;
+  return frame({ W: vb.width, H: vb.height, l: pad, r: pad, t: pad, b: pad, x: [dom[0], dom[1]], y: [dom[2], dom[3]] });
+}
+function border(svg, f) { el('rect', { x: f.L, y: f.T, width: f.R - f.L, height: f.B - f.T, fill: 'none', stroke: 'var(--rule)' }, svg); }
+function gridDims(f, gw) { return [gw, Math.max(8, Math.round(gw * (f.B - f.T) / (f.R - f.L)))]; }
+function cellXY(dom, gw, gh, i, j) { return [dom[0] + (i + .5) / gw * (dom[1] - dom[0]), dom[2] + (j + .5) / gh * (dom[3] - dom[2])]; }
+/* P[j*gw+i] = p(B) at cell (i, j from bottom) */
+function evalGrid(dom, gw, gh, pf) { const P = new Float32Array(gw * gh); for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) { const [x, y] = cellXY(dom, gw, gh, i, j); P[j * gw + i] = pf(x, y); } return P; }
+const GCACHE = new Map();
+function rbfGrid(S, dom, gw, gh) {
+  const key = S.K + ':' + dom.join(',') + ':' + gw + 'x' + gh;
+  if (GCACHE.has(key)) return GCACHE.get(key);
+  const F = new Float32Array(gw * gh * S.K);
+  for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) { const [x, y] = cellXY(dom, gw, gh, i, j); F.set(feat(S, x, y), (j * gw + i) * S.K); }
+  const g = { F, K: S.K, gw, gh }; GCACHE.set(key, g); return g;
+}
+function rbfP(g, w) { const n = g.gw * g.gh, K = g.K, P = new Float32Array(n); for (let c = 0; c < n; c++) { let s = 0; const o = c * K; for (let k = 0; k < K; k++) s += w[k] * g.F[o + k]; P[c] = sigm(s); } return P; }
+function field(svg, f, P, gw, gh) {
+  const A = hexRgb(cssv('--c0')), B = hexRgb(cssv('--c1'));
+  raster(svg, f, gw, gh, (i, j) => { const p = P[j * gw + i], c = p >= .5 ? B : A; return [c[0], c[1], c[2], .05 + .3 * Math.abs(2 * p - 1)]; });
+}
+/* marching squares on cell centers */
+function contour(svg, f, P, gw, gh, lev, attrs) {
+  const dx = (f.R - f.L) / gw, dy = (f.B - f.T) / gh, segs = [];
+  const X = i => f.L + (i + .5) * dx, Y = j => f.B - (j + .5) * dy;
+  const lerp = (a, b, va, vb) => a + (lev - va) / (vb - va) * (b - a);
+  for (let j = 0; j < gh - 1; j++) for (let i = 0; i < gw - 1; i++) {
+    const v0 = P[j * gw + i], v1 = P[j * gw + i + 1], v2 = P[(j + 1) * gw + i + 1], v3 = P[(j + 1) * gw + i];
+    const pts = [];
+    if ((v0 < lev) !== (v1 < lev)) pts.push([lerp(X(i), X(i + 1), v0, v1), Y(j)]);
+    if ((v1 < lev) !== (v2 < lev)) pts.push([X(i + 1), lerp(Y(j), Y(j + 1), v1, v2)]);
+    if ((v2 < lev) !== (v3 < lev)) pts.push([lerp(X(i + 1), X(i), v2, v3), Y(j + 1)]);
+    if ((v3 < lev) !== (v0 < lev)) pts.push([X(i), lerp(Y(j + 1), Y(j), v3, v0)]);
+    if (pts.length >= 2) segs.push(`M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}L${pts[1][0].toFixed(1)},${pts[1][1].toFixed(1)}`);
+    if (pts.length === 4) segs.push(`M${pts[2][0].toFixed(1)},${pts[2][1].toFixed(1)}L${pts[3][0].toFixed(1)},${pts[3][1].toFixed(1)}`);
+  }
+  return el('path', Object.assign({ d: segs.join(''), fill: 'none', stroke: 'var(--mi)', 'stroke-width': 2.4, 'stroke-linecap': 'round' }, attrs || {}), svg);
+}
+function unlab(g, x, y, r, extra) { return el('circle', Object.assign({ cx: x, cy: y, r: r || 2.5, fill: 'var(--muted)', opacity: .5 }, extra || {}), g); }
+function hollow(g, x, y, c, r, extra) {
+  r = r || 3.6; const a = Object.assign({ fill: 'none', stroke: `var(${CLS[c]})`, 'stroke-width': 1.6 }, extra || {});
+  if (c === 1) return el('rect', Object.assign({ x: x - r * .85, y: y - r * .85, width: r * 1.7, height: r * 1.7 }, a), g);
+  return el('circle', Object.assign({ cx: x, cy: y, r }, a), g);
+}
+function bigMark(g, x, y, c, r) { return mark(g, x, y, c, r || 6.5, { stroke: 'var(--ink)', 'stroke-width': 1.6 }); }
+function smallX(g, x, y, s) { s = s || 3.4; el('path', { d: `M${x - s},${y - s}L${x + s},${y + s}M${x - s},${y + s}L${x + s},${y - s}`, stroke: 'var(--ink)', 'stroke-width': 1.5, 'stroke-linecap': 'round' }, g); }
+function nearestPt(svg, f, X, evt, maxPx, filter) {
+  const p = svgPt(svg, evt); let best = -1, bd = (maxPx || 12) ** 2;
+  for (let i = 0; i < X.length; i++) { if (filter && !filter(i)) continue; const dx = f.X(X[i][0]) - p.x, dy = f.Y(X[i][1]) - p.y, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; } }
+  return best;
+}
+function mixCol(t) { const A = hexRgb(cssv('--c0')), B = hexRgb(cssv('--c1')); return `rgb(${A.map((a, k) => Math.round(a + (B[k] - a) * t)).join(',')})`; }
+function lineChart(svg, o) {
+  clear(svg);
+  const f = frame({ W: svg.viewBox.baseVal.width, H: svg.viewBox.baseVal.height, l: 44, r: 12, t: 10, b: 36, x: o.x, y: o.y });
+  axes(svg, f, { xt: o.xt || ticksAB(o.x[0], o.x[1], 5), yt: o.yt || ticksAB(o.y[0], o.y[1], 4), xl: o.xl, yl: o.yl, fy: o.fy });
+  const g = clip(svg, f);
+  o.series.forEach(s => {
+    const pts = s.pts.filter(p => isFinite(p[1])).map(p => [f.X(p[0]), f.Y(clamp(p[1], o.y[0], o.y[1]))]);
+    if (pts.length) poly(g, pts, s.col, s.w || 2.2, s.dash ? { 'stroke-dasharray': s.dash } : {});
+    if (s.dots) pts.forEach(p => el('circle', { cx: p[0], cy: p[1], r: 2.8, fill: s.col }, g));
+  });
+  return f;
+}
+const pickLabels = (y, n, seed) => { const r = rng(seed), ix = shuffleIdx(y.length, r); return [...ix.filter(i => y[i] === 0).slice(0, n), ...ix.filter(i => y[i] === 1).slice(0, n)]; };
+const fitIdx = (F, idx, ys, w0) => fitLogit(idx.map(i => F[i]), ys, idx.map(() => 1), LAM, w0);
+const predAcc = (F, w, y, skip) => { let s = 0, n = 0; for (let i = 0; i < F.length; i++) { if (skip && skip.has(i)) continue; s += (dot(w, F[i]) >= 0 ? 1 : 0) === y[i]; n++; } return n ? s / n : 0; };
+
+/* shared moons data for §19.3 and §19.3.1 */
+const MO = moons(300, 0.1, 7), MOT = moons(400, 0.1, 99);
+const MS = rbfSpec(MO.dom, 14, 9, 1.0);
+const MF = MO.X.map(p => feat(MS, p[0], p[1])), MFT = MOT.X.map(p => feat(MS, p[0], p[1]));
+let MOG = null;
+const moGraph = () => MOG || (MOG = (() => { const W = knnGraph(MO.X, 8, 0.2); return { W, cs: colSums(W) }; })());
+
+/* ================= §19.3 ================= */
+(function () {
+  const svg = $('#ssl-plot'), cur = $('#ssl-curve');
+  let seed = 1, lab, w, lpY, accS, accL;
+  const nS = slider('ssl-n', v => v, () => { refit(); draw(); drawCurve(); });
+  function refit() {
+    lab = pickLabels(MO.y, nS.v, seed);
+    w = fitIdx(MF, lab, lab.map(i => MO.y[i]));
+    const labels = MO.y.map(() => -1); lab.forEach(i => { labels[i] = MO.y[i]; });
+    const G = moGraph(); lpY = lpClosed(G.W, G.cs, labels, 2);
+    const ls = new Set(lab); let a = 0, b = 0, n = 0;
+    MO.X.forEach((_, i) => { if (ls.has(i)) return; n++; a += (dot(w, MF[i]) >= 0 ? 1 : 0) === MO.y[i]; b += (lpY[i][1] > lpY[i][0] ? 1 : 0) === MO.y[i]; });
+    accS = a / n; accL = b / n;
+  }
+  function draw() {
+    clear(svg);
+    const f = plot2(svg, MO.dom), [gw, gh] = gridDims(f, 130), g = rbfGrid(MS, MO.dom, gw, gh), P = rbfP(g, w);
+    field(svg, f, P, gw, gh); contour(svg, f, P, gw, gh, .5); border(svg, f);
+    const ls = new Set(lab), showU = $('#ssl-u').checked, byLP = $('#ssl-lp').checked;
+    if (showU) MO.X.forEach((p, i) => { if (ls.has(i)) return; if (byLP) el('circle', { cx: f.X(p[0]), cy: f.Y(p[1]), r: 3, fill: mixCol(lpY[i][1]), opacity: .85 }, svg); else unlab(svg, f.X(p[0]), f.Y(p[1])); });
+    lab.forEach(i => bigMark(svg, f.X(MO.X[i][0]), f.Y(MO.X[i][1]), MO.y[i]));
+    $('#ssl-stats').innerHTML = stat('labeled points', lab.length) + stat('unlabeled points', 300 - lab.length) + stat('supervised accuracy', pct(accS), 'a') + stat('label propagation accuracy', pct(accL), 'm');
+  }
+  /* accuracy-vs-labels curve, computed in small chunks */
+  const NMAX = 10, DRAWS = 12, RES = Array.from({ length: NMAX + 1 }, () => []);
+  let todo = [];
+  for (let d = 0; d < DRAWS; d++) for (let n = 1; n <= NMAX; n++) todo.push([n, d]);
+  function work() {
+    const t0 = performance.now();
+    while (todo.length && performance.now() - t0 < 30) {
+      const [n, d] = todo.shift(), lb = pickLabels(MO.y, n, 1000 + 37 * d + n), ww = fitIdx(MF, lb, lb.map(i => MO.y[i]));
+      const labels = MO.y.map(() => -1); lb.forEach(i => { labels[i] = MO.y[i]; });
+      const G = moGraph(), Y = lpClosed(G.W, G.cs, labels, 2), ls = new Set(lb); let a = 0, b = 0, m = 0;
+      MO.X.forEach((_, i) => { if (ls.has(i)) return; m++; a += (dot(ww, MF[i]) >= 0 ? 1 : 0) === MO.y[i]; b += (Y[i][1] > Y[i][0] ? 1 : 0) === MO.y[i]; });
+      RES[n].push([a / m, b / m]);
+    }
+    $('#ssl-prog i').style.width = (100 * (1 - todo.length / (NMAX * DRAWS))) + '%';
+    drawCurve();
+    if (todo.length) setTimeout(work, 0); else $('#ssl-prog').style.visibility = 'hidden';
+  }
+  function drawCurve() {
+    const S = [], L = [];
+    for (let n = 1; n <= NMAX; n++) if (RES[n].length) { S.push([n, mean(RES[n].map(r => r[0]))]); L.push([n, mean(RES[n].map(r => r[1]))]); }
+    const f = lineChart(cur, { x: [1, NMAX], y: [0.5, 1], xt: [1, 2, 4, 6, 8, 10], yt: [.5, .6, .7, .8, .9, 1], fy: v => (100 * v).toFixed(0) + '%', xl: 'labels per class', yl: 'accuracy', series: [{ pts: S, col: 'var(--gap)', dots: 1 }, { pts: L, col: 'var(--mi)', dots: 1 }] });
+    el('line', { x1: f.X(nS.v), x2: f.X(nS.v), y1: f.T, y2: f.B, stroke: 'var(--ink)', 'stroke-dasharray': '3 3', opacity: .5 }, cur);
+  }
+  $('#ssl-u').addEventListener('change', draw); $('#ssl-lp').addEventListener('change', () => { if ($('#ssl-lp').checked) $('#ssl-u').checked = true; draw(); });
+  $('#ssl-new').addEventListener('click', () => { seed++; refit(); draw(); });
+  refit(); draw(); drawCurve();
+  whenSeen(cur, () => setTimeout(work, 50));
+  renderers.push(() => { draw(); drawCurve(); });
+})();
+
+/* ================= §19.3.1 self-training ================= */
+(function () {
+  const svg = $('#st-plot'), cur = $('#st-curve');
+  let lab = [], w, plab = new Map(), round = 0, hist = [], phase = 'fit', converged = false, anim = 0;
+  const tau = slider('st-tau', v => v.toFixed(3));
+  const labSet = () => new Set(lab);
+  function evaluate() {
+    let ok = 0; for (const [i, l] of plab) ok += l === MO.y[i];
+    return { acc: predAcc(MFT, w, MOT.y), pacc: plab.size ? ok / plab.size : NaN, frac: plab.size / (300 - lab.length), n: plab.size, wrong: plab.size - ok };
+  }
+  function reset(newLab) {
+    stop(); if (newLab) lab = newLab;
+    w = fitIdx(MF, lab, lab.map(i => MO.y[i])); plab = new Map(); round = 0; converged = false; phase = 'fit';
+    hist = [evaluate()]; draw();
+  }
+  function step() {
+    if (converged) return false;
+    const ls = labSet(), np = new Map();
+    for (let i = 0; i < 300; i++) { if (ls.has(i)) continue; const p = sigm(dot(w, MF[i])); if (Math.max(p, 1 - p) >= tau.v) np.set(i, p >= .5 ? 1 : 0); }
+    let same = np.size === plab.size; if (same) for (const [i, l] of np) if (plab.get(i) !== l) { same = false; break; }
+    if (same && round > 0) { converged = true; phase = 'done'; draw(); return false; }
+    plab = np;
+    const idx = [...lab, ...plab.keys()], ys = [...lab.map(i => MO.y[i]), ...plab.values()];
+    w = fitIdx(MF, idx, ys, w); round++; phase = 'round';
+    hist.push(evaluate()); draw(); return true;
+  }
+  function stop() { if (anim) clearTimeout(anim); anim = 0; $('#st-run').textContent = 'Run to convergence'; }
+  $('#st-run').addEventListener('click', () => {
+    if (anim) { stop(); return; }
+    $('#st-run').textContent = 'Pause';
+    const tick = () => { if (step() && round < 40) anim = setTimeout(tick, 260); else stop(); };
+    tick();
+  });
+  $('#st-step').addEventListener('click', () => { stop(); step(); });
+  $('#st-reset').addEventListener('click', () => reset());
+  segm('st-draw', v => reset(pickLabels(MO.y, 3, v === 'rand' ? 2000 + Math.floor(Math.random() * 1e6) : +v)));
+  $('#st-wrong').addEventListener('change', draw);
+  tau.el.addEventListener('input', () => { if (converged) { converged = false; phase = 'round'; draw(); } });
+  svg.addEventListener('click', e => {
+    const f = svg._f; if (!f) return; const i = nearestPt(svg, f, MO.X, e, 12); if (i < 0) return;
+    const k = lab.indexOf(i); if (k >= 0) { if (lab.length <= 2) return; lab.splice(k, 1); } else lab.push(i);
+    reset();
+  });
+  function draw() {
+    clear(svg);
+    const f = plot2(svg, MO.dom), [gw, gh] = gridDims(f, 130), g = rbfGrid(MS, MO.dom, gw, gh), P = rbfP(g, w); svg._f = f;
+    field(svg, f, P, gw, gh); contour(svg, f, P, gw, gh, .5); border(svg, f);
+    const ls = labSet(), showW = $('#st-wrong').checked;
+    MO.X.forEach((p, i) => {
+      if (ls.has(i)) return; const x = f.X(p[0]), y = f.Y(p[1]);
+      if (plab.has(i)) { const l = plab.get(i); hollow(svg, x, y, l); if (showW && l !== MO.y[i]) smallX(svg, x, y); }
+      else unlab(svg, x, y);
+    });
+    lab.forEach(i => bigMark(svg, f.X(MO.X[i][0]), f.Y(MO.X[i][1]), MO.y[i]));
+    const h = hist[hist.length - 1], h0 = hist[0];
+    $('#st-stats').innerHTML = stat('round', round) + stat('test accuracy', pct(h.acc), 'm') + stat('pseudo-labels', h.n) + stat('pseudo-label accuracy', isFinite(h.pacc) ? pct(h.pacc) : '—', 'g') + stat('wrong pseudo-labels', h.wrong, h.wrong ? 'r' : '') + stat('real labels', lab.length);
+    const L = [['1', 'fit f on the labeled set D_L', 'fit'], ['2', 'repeat:', ''], ['3', `  pseudo-label D_U, keep max p ≥ ${tau.v.toFixed(3)}`, 'round'], ['4', '  refit f on D_L ∪ kept pseudo-labels', 'round'], ['5', 'until the pseudo-labels stop changing', 'done']];
+    $('#st-algo').innerHTML = L.map(([n, t, ph]) => `<div class="${ph && ph === phase ? 'on' : ''}"><span class="ln">${n}</span>${t.replace(/ /g, '&nbsp;')}</div>`).join('');
+    const d = h.acc - h0.acc, say = $('#st-say');
+    if (round === 0) { say.className = 'verdict'; say.textContent = `Round 0: supervised only, ${pct(h0.acc)} test accuracy. Press Round.`; }
+    else if (d > 0.01) { say.className = 'verdict ok'; say.textContent = `${converged ? 'Converged. ' : ''}Test accuracy ${pct(h0.acc)} → ${pct(h.acc)}: the pseudo-labels spread out from the confident regions.`; }
+    else if (d < -0.01) { say.className = 'verdict bad'; say.textContent = `${converged ? 'Converged. ' : ''}Test accuracy ${pct(h0.acc)} → ${pct(h.acc)}: confirmation bias. ${h.wrong} wrong pseudo-labels are now training targets.`; }
+    else { say.className = 'verdict meh'; say.textContent = `${converged ? 'Converged. ' : ''}Test accuracy ${pct(h0.acc)} → ${pct(h.acc)}: the model mostly re-learned its own first guess.`; }
+    const xmax = Math.max(8, round);
+    lineChart(cur, { x: [0, xmax], y: [0, 1], yt: [0, .25, .5, .75, 1], fy: v => (100 * v).toFixed(0) + '%', xl: 'round', series: [
+      { pts: hist.map((r, k) => [k, r.frac]), col: 'var(--muted)', dash: '5 4', w: 1.8 },
+      { pts: hist.map((r, k) => [k, r.pacc]), col: 'var(--green)', dots: 1 },
+      { pts: hist.map((r, k) => [k, r.acc]), col: 'var(--mi)', dots: 1 }] });
+  }
+  lab = pickLabels(MO.y, 3, 51); reset();
+  renderers.push(draw);
+})();
+
+/* ================= §19.3.2 Fig 19.9 ================= */
+(function () {
+  const svg = $('#em-plot');
+  let z = 1.2;
+  const Ts = slider('em-T', v => v.toFixed(2), draw);
+  const ent = z => H2(sigm(z)), stl = z => softplus(-Math.abs(z));
+  const shp = (z, T) => { const q = sigm(z / T); return q * softplus(-z) + (1 - q) * softplus(z); };
+  let f;
+  function draw() {
+    clear(svg);
+    f = frame({ W: 520, H: 300, l: 44, r: 12, t: 12, b: 36, x: [-8, 8], y: [0, 0.8] });
+    axes(svg, f, { xt: [-8, -4, 0, 4, 8], yt: [0, .2, .4, .6, .8], xl: 'logit z  (p(B) = σ(z))', yl: 'loss' });
+    const g = clip(svg, f), zs = range(321).map(k => -8 + k * 0.05), T = Ts.v;
+    el('line', { x1: f.L, x2: f.R, y1: f.Y(Math.LN2), y2: f.Y(Math.LN2), stroke: 'var(--muted)', 'stroke-dasharray': '2 4' }, g);
+    txt(svg, f.R - 4, f.Y(Math.LN2) - 5, 'ln 2', 'ax', { 'text-anchor': 'end' });
+    poly(g, zs.map(z => [f.X(z), f.Y(shp(z, .5))]), 'var(--c6)', 2, { 'stroke-dasharray': '6 4' });
+    poly(g, zs.map(z => [f.X(z), f.Y(stl(z))]), 'var(--c3)', 2.4);
+    poly(g, zs.map(z => [f.X(z), f.Y(ent(z))]), 'var(--c5)', 2.4);
+    poly(g, zs.map(z => [f.X(z), f.Y(shp(z, T))]), 'var(--mi)', 3);
+    el('line', { x1: f.X(z), x2: f.X(z), y1: f.T, y2: f.B, stroke: 'var(--ink)', opacity: .35 }, g);
+    [[ent(z), '--c5'], [stl(z), '--c3'], [shp(z, T), '--mi']].forEach(([v, c]) => el('circle', { cx: f.X(z), cy: f.Y(v), r: 5, fill: `var(${c})`, stroke: 'var(--surface)', 'stroke-width': 1.5 }, g));
+    const p = sigm(z), q = sigm(z / T), hard = p >= .5 ? 1 : 0;
+    const row = (k, v, c) => `<div class="r"><span>${k}</span><div class="bar"><i style="width:${(100 * v).toFixed(1)}%;background:var(${c})"></i></div><span class="v">${v.toFixed(3)}</span></div>`;
+    $('#em-bars').innerHTML = row('p(B)', p, '--c1') + row('q, T=1', p, '--c5') + row(`q, T=${T.toFixed(2)}`, q, '--mi') + row('q, T→0', hard, '--c3');
+    $('#em-stats').innerHTML = stat('z', f2(z)) + stat('entropy H(p)', f3(ent(z))) + stat('self-training', f3(stl(z))) + stat(`sharpened, T=${T.toFixed(2)}`, f3(shp(z, T)), 'm');
+  }
+  onDrag(svg, p => { z = clamp(f.iX(p.x), -8, 8); draw(); }, p => { z = clamp(f.iX(p.x), -8, 8); draw(); });
+  svg.addEventListener('keydown', e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { z = clamp(z + (e.key === 'ArrowLeft' ? -.25 : .25), -8, 8); draw(); e.preventDefault(); } });
+  draw(); renderers.push(draw);
+})();
+
+/* ================= §19.3.2.1 cluster assumption ================= */
+(function () {
+  const svg = $('#cl-plot'), prof = $('#cl-prof');
+  const r = rng(5), U = [], Uy = [];
+  for (let i = 0; i < 200; i++) { const c = i % 2; U.push([(c ? 1.1 : -1.1) + 0.45 * gauss(r), 0.9 * gauss(r)]); Uy.push(c); }
+  const PRE = { a: [[-0.6, 1.6], [0.9, -1.5]], b: [[-0.9, 1.3], [0.2, -1.4]] }, Ly = [0, 1], DOM = [-3.6, 3.6, -2.5, 2.5], L2 = 0.05;
+  let L = PRE.a.map(p => p.slice()), th = [0, 0, 0], steps = 0, anim = 0, hov = -1, f;
+  const lu = slider('cl-lu', v => v.toFixed(1)), lb = slider('cl-lb', v => v.toFixed(1));
+  function grad(th, wu, wb) {
+    const [w1, w2, b] = th, g = [0, 0, 0];
+    L.forEach((x, i) => { const p = sigm(w1 * x[0] + w2 * x[1] + b), d = (p - Ly[i]) / L.length; g[0] += d * x[0]; g[1] += d * x[1]; g[2] += d; });
+    if (wu || wb) {
+      const zs = U.map(x => w1 * x[0] + w2 * x[1] + b), ps = zs.map(sigm), pb = clamp(mean(ps), 1e-9, 1 - 1e-9), lpb = Math.log(pb / (1 - pb));
+      U.forEach((x, i) => { const p = ps[i], d = (wu * (-zs[i] * p * (1 - p)) + wb * lpb * p * (1 - p)) / U.length; g[0] += d * x[0]; g[1] += d * x[1]; g[2] += d; });
+    }
+    g[0] += L2 * w1; g[1] += L2 * w2; return g;
+  }
+  function supFit() { th = [0, 0, 0]; for (let s = 0; s < 3000; s++) { const g = grad(th, 0, 0); th = th.map((v, k) => v - 0.5 * g[k]); } steps = 0; }
+  function run(n) { for (let s = 0; s < n; s++) { const g = grad(th, lu.v, lb.v); th = th.map((v, k) => v - 0.3 * g[k]); } steps += n; }
+  const pOf = x => sigm(th[0] * x[0] + th[1] * x[1] + th[2]);
+  function stop() { if (anim) cancelAnimationFrame(anim); anim = 0; $('#cl-run').textContent = 'Run'; }
+  $('#cl-run').addEventListener('click', () => {
+    if (anim) { stop(); return; }
+    $('#cl-run').textContent = 'Pause';
+    const tick = () => { run(40); draw(); if (steps < 6000) anim = requestAnimationFrame(tick); else stop(); };
+    anim = requestAnimationFrame(tick);
+  });
+  $('#cl-step').addEventListener('click', () => { stop(); run(50); draw(); });
+  $('#cl-reset').addEventListener('click', () => { stop(); supFit(); draw(); });
+  segm('cl-preset', v => { stop(); L = PRE[v].map(p => p.slice()); supFit(); draw(); });
+  $('#cl-true').addEventListener('change', draw);
+  let drag = -1;
+  onDrag(svg, p => {
+    drag = -1; let bd = 16 * 16;
+    L.forEach((x, i) => { const d = (f.X(x[0]) - p.x) ** 2 + (f.Y(x[1]) - p.y) ** 2; if (d < bd) { bd = d; drag = i; } });
+    if (drag < 0) return false; stop();
+  }, p => { L[drag] = [clamp(f.iX(p.x), DOM[0], DOM[1]), clamp(f.iY(p.y), DOM[2], DOM[3])]; supFit(); draw(); });
+  svg.addEventListener('pointermove', e => { if (!f) return; const i = nearestPt(svg, f, U, e, 10); if (i !== hov) { hov = i; draw(); } });
+  function draw() {
+    clear(svg);
+    f = plot2(svg, DOM); const [gw, gh] = gridDims(f, 120);
+    const P = evalGrid(DOM, gw, gh, (x, y) => pOf([x, y]));
+    field(svg, f, P, gw, gh); contour(svg, f, P, gw, gh, .5); border(svg, f);
+    const showT = $('#cl-true').checked;
+    U.forEach((x, i) => {
+      const X = f.X(x[0]), Y = f.Y(x[1]);
+      if (showT) mark(svg, X, Y, Uy[i], 3, { opacity: .7, stroke: 'none' }); else unlab(svg, X, Y, 2.7, { opacity: .6 });
+      if (i === hov) ring(svg, X, Y, 7);
+    });
+    L.forEach((x, i) => { bigMark(svg, f.X(x[0]), f.Y(x[1]), Ly[i], 8); });
+    const ps = U.map(pOf), pb = mean(ps), EH = mean(ps.map(H2)), Hb = H2(pb), nw = Math.hypot(th[0], th[1]);
+    let acc = 0; ps.forEach((p, i) => acc += (p >= .5 ? 1 : 0) === Uy[i]); acc /= U.length;
+    $('#cl-stats').innerHTML = stat('steps', steps) + stat('accuracy on unlabeled', pct(acc), 'm') + stat('mean entropy E[H(p)]', f3(EH), 'b') + stat('H(p̄)', f3(Hb)) + stat('p̄ = mean p(B)', f2(pb)) + stat('‖w‖', f2(nw));
+    if (hov >= 0) {
+      const p = ps[hov], row = (k, v, c) => `<div class="r"><span>${k}</span><div class="bar"><i style="width:${(100 * v).toFixed(1)}%;background:var(${c})"></i></div><span class="v">${v.toFixed(3)}</span></div>`;
+      $('#cl-hov').textContent = `point ${hov} (true class ${Uy[hov] ? 'B' : 'A'}): entropy ${f3(H2(p))}`;
+      $('#cl-bars').innerHTML = row('class A', 1 - p, '--c0') + row('class B', p, '--c1');
+    }
+    drawProf(nw);
+  }
+  function drawProf(nw) {
+    clear(prof);
+    const S0 = -3.5, S1 = 3.5;
+    const pf = frame({ W: 440, H: 300, l: 44, r: 12, t: 10, b: 36, x: [S0, S1], y: [-0.75, 0.75] });
+    axes(prof, pf, { xt: [-3, -2, -1, 0, 1, 2, 3], yt: [-.6, -.3, 0, .3, .6], xl: 'boundary position along the normal', yl: 'loss on unlabeled' });
+    prof._f = pf;
+    if (nw < 1e-6) return;
+    const n = [th[0] / nw, th[1] / nw], d = U.map(x => n[0] * x[0] + n[1] * x[1]);
+    const nb = 35, bw = (S1 - S0) / nb, cnt = new Array(nb).fill(0); d.forEach(v => { const k = Math.floor((v - S0) / bw); if (k >= 0 && k < nb) cnt[k]++; });
+    const cm = Math.max(...cnt), g = clip(prof, pf);
+    cnt.forEach((c, k) => { const h = c / cm * 0.45; el('rect', { x: pf.X(S0 + k * bw) + .5, y: pf.Y(-0.75 + h), width: pf.X(S0 + bw) - pf.X(S0) - 1, height: pf.Y(-0.75) - pf.Y(-0.75 + h), fill: 'var(--muted)', opacity: .25 }, g); });
+    const ss = range(141).map(k => S0 + k * (S1 - S0) / 140), E = [], M = [];
+    ss.forEach(s => { const ps = d.map(v => sigm(nw * (v - s))), eh = mean(ps.map(H2)); E.push([pf.X(s), pf.Y(eh)]); M.push([pf.X(s), pf.Y(eh - H2(mean(ps)))]); });
+    el('line', { x1: pf.L, x2: pf.R, y1: pf.Y(0), y2: pf.Y(0), stroke: 'var(--muted)' }, g);
+    poly(g, E, 'var(--c5)', 2.4); poly(g, M, 'var(--mi)', 2.4);
+    const sc = -th[2] / nw;
+    el('line', { x1: pf.X(sc), x2: pf.X(sc), y1: pf.T, y2: pf.B, stroke: 'var(--ink)', 'stroke-dasharray': '4 3' }, g);
+    txt(prof, clamp(pf.X(sc), pf.L + 30, pf.R - 30), pf.T + 12, 'now', 'lbl', { 'text-anchor': 'middle', fill: 'var(--ink)', class: 'lbl halo' });
+  }
+  onDrag(prof, p => { const pf = prof._f, nw = Math.hypot(th[0], th[1]); if (!pf || nw < 1e-6) return false; stop(); th[2] = -clamp(pf.iX(p.x), -3.5, 3.5) * nw; draw(); },
+    p => { const pf = prof._f, nw = Math.hypot(th[0], th[1]); th[2] = -clamp(pf.iX(p.x), -3.5, 3.5) * nw; draw(); });
+  supFit(); draw(); renderers.push(draw);
+})();
+
+/* ================= §19.3.2.2 mutual information ================= */
+(function () {
+  const svg = $('#mi-bars'), h1 = $('#mi-h1'), h2 = $('#mi-h2');
+  const FAV = [0, 1, 2, 0, 1, 2, 0, 1, 2], r = rng(3), NZ = FAV.map(() => [0, 1, 2].map(() => 0.35 * gauss(r)));
+  const sS = slider('mi-s', v => v.toFixed(2), draw), cS = slider('mi-c', v => v.toFixed(2), draw);
+  const H = p => -p.reduce((s, v) => s + (v > 1e-12 ? v * Math.log(v) : 0), 0);
+  function preds(s, c) { return FAV.map((fv, i) => { const z = [0, 1, 2].map(k => s * ((1 - c) * (k === fv) + c * (k === 0)) + NZ[i][k]); const m = Math.max(...z), e = z.map(v => Math.exp(v - m)), t = e[0] + e[1] + e[2]; return e.map(v => v / t); }); }
+  function stats(s, c) { const P = preds(s, c), pb = [0, 1, 2].map(k => mean(P.map(p => p[k]))), EH = mean(P.map(H)), Hb = H(pb); return { P, pb, EH, Hb, I: Hb - EH }; }
+  const NG = 48, S1 = 6;
+  let M1 = null, M2 = null;
+  function maps() {
+    M1 = new Float32Array(NG * NG); M2 = new Float32Array(NG * NG);
+    for (let j = 0; j < NG; j++) for (let i = 0; i < NG; i++) { const st = stats((i + .5) / NG * S1, (j + .5) / NG); M1[j * NG + i] = st.EH; M2[j * NG + i] = -st.I; }
+  }
+  function heat(svgH, M, lo, hi) {
+    clear(svgH);
+    const f = frame({ W: 220, H: 230, l: 34, r: 6, t: 6, b: 34, x: [0, S1], y: [0, 1] });
+    const a = hexRgb(cssv('--surface')), b = hexRgb(cssv('--mi'));
+    raster(svgH, f, NG, NG, (i, j) => { const t = 1 - clamp((M[j * NG + i] - lo) / (hi - lo), 0, 1); return [0, 1, 2].map(k => Math.round(a[k] + (b[k] - a[k]) * t * .9)).concat([1]); });
+    axes(svgH, f, { xt: [0, 2, 4, 6], yt: [0, .5, 1], xl: 'confidence', yl: 'pull to A' });
+    const x = f.X(sS.v), y = f.Y(cS.v);
+    el('line', { x1: x, x2: x, y1: f.T, y2: f.B, stroke: 'var(--ink)', opacity: .5 }, svgH); el('line', { x1: f.L, x2: f.R, y1: y, y2: y, stroke: 'var(--ink)', opacity: .5 }, svgH);
+    el('circle', { cx: x, cy: y, r: 5, fill: 'var(--surface)', stroke: 'var(--ink)', 'stroke-width': 2 }, svgH);
+    svgH._f = f;
+  }
+  function draw() {
+    const st = stats(sS.v, cS.v);
+    clear(svg);
+    const W = 520, top = 14, base = 170, hh = base - top, gwid = 40, gap = 10, cols = ['var(--c0)', 'var(--c1)', 'var(--c2)'];
+    const group = (x0, p, lab, bold) => {
+      p.forEach((v, k) => el('rect', { x: x0 + k * (gwid / 3), y: base - v * hh, width: gwid / 3 - 2, height: Math.max(v * hh, .5), fill: cols[k], opacity: bold ? 1 : .85 }, svg));
+      txt(svg, x0 + gwid / 2 - 1, base + 16, lab, bold ? 'lbl' : 'ax', { 'text-anchor': 'middle', fill: 'var(--ink)' });
+      txt(svg, x0 + gwid / 2 - 1, base + 30, 'H=' + H(p).toFixed(2), 'ax', { 'text-anchor': 'middle' });
+    };
+    el('line', { x1: 4, x2: W - 4, y1: base, y2: base, class: 'base' }, svg);
+    st.P.forEach((p, i) => group(8 + i * (gwid + gap), p, 'x' + (i + 1)));
+    const xa = 8 + 9 * (gwid + gap) + 14;
+    el('line', { x1: xa - 10, x2: xa - 10, y1: top, y2: base + 30, stroke: 'var(--rule)' }, svg);
+    group(xa, st.pb, 'p̄', true);
+    txt(svg, 8, top - 2, 'bars: class A, B, C', 'ax');
+    $('#mi-stats').innerHTML = stat('E[H(p)] (entropy loss)', f3(st.EH), 'b') + stat('H(p̄)', f3(st.Hb)) + stat('I = H(p̄) − E[H(p)]', f3(st.I), 'm') + stat('MI loss −I', f3(-st.I), 'm');
+    if (!M1) maps();
+    heat(h1, M1, 0, Math.log(3)); heat(h2, M2, -Math.log(3), 0.05);
+    const say = $('#mi-say');
+    if (st.EH < 0.15 && st.I < 0.3) { say.className = 'verdict bad'; say.textContent = 'Entropy minimization is happy (E[H] ≈ 0), but everyone is class A, so I ≈ 0. This is the degenerate solution.'; }
+    else if (st.EH < 0.25 && st.I > 0.9) { say.className = 'verdict ok'; say.textContent = 'Confident and balanced: both losses are near their minimum, and I is close to ln 3 ≈ 1.099.'; }
+    else if (st.EH > 0.8) { say.className = 'verdict meh'; say.textContent = 'Predictions are spread out, so E[H] is high and both losses dislike it.'; }
+    else { say.className = 'verdict'; say.textContent = `I = ${f3(st.I)} of a possible ${f3(Math.log(3))}.`; }
+    const g = $('#mi-ramp'); g.style.background = `linear-gradient(90deg, var(--mi), var(--surface))`;
+  }
+  [h1, h2].forEach(s => onDrag(s, p => { const f = s._f; sS.set(clamp(f.iX(p.x), 0, S1)); cS.set(clamp(f.iY(p.y), 0, 1)); draw(); }, p => { const f = s._f; sS.set(clamp(f.iX(p.x), 0, S1)); cS.set(clamp(f.iY(p.y), 0, 1)); draw(); }));
+  draw(); renderers.push(draw);
+})();
+
+/* ================= §19.3.3 co-training ================= */
+(function () {
+  function coData(n, seed, corr) {
+    const r = rng(seed), A = [], B = [], y = [];
+    for (let i = 0; i < n; i++) {
+      const c = i % 2, s = c ? 1 : -1, a = [s * 0.8 + 0.75 * gauss(r), 0.75 * gauss(r)];
+      const b = corr ? [-a[1] + 0.15 * gauss(r), a[0] + 0.15 * gauss(r)] : [0.75 * gauss(r), s * 0.8 + 0.75 * gauss(r)];
+      A.push(a); B.push(b); y.push(c);
+    }
+    return { A, B, y };
+  }
+  const lf = p => Float64Array.from([1, p[0], p[1]]), DOM = [-3.6, 3.6, -2.9, 2.9];
+  const sa = $('#co-a'), sb = $('#co-b'), cur = $('#co-curve');
+  let corr = false, lseed = 101, D, T, lab, S1, S2, R1, R2, w1, w2, round, hist, anim = 0, hov = -1, added, wrong;
+  const tau = slider('co-tau', v => v.toFixed(2)), kS = slider('co-k', v => v);
+  const fit = (V, S) => { const k = [...S.keys()]; return fitLogit(k.map(i => lf(V[i])), k.map(i => S.get(i)), k.map(() => 1), 0.05); };
+  const pA = i => sigm(dot(w1, lf(D.A[i]))), pB = i => sigm(dot(w2, lf(D.B[i])));
+  function evaluate() {
+    let a = 0, b = 0, c = 0;
+    for (let i = 0; i < T.y.length; i++) { const z1 = dot(w1, lf(T.A[i])), z2 = dot(w2, lf(T.B[i])); a += (z1 >= 0) === !!T.y[i]; b += (z2 >= 0) === !!T.y[i]; c += (z1 + z2 >= 0) === !!T.y[i]; }
+    const n = T.y.length; return [a / n, b / n, c / n];
+  }
+  function reset(newData) {
+    stop();
+    if (newData || !D) { D = coData(300, 1, corr); T = coData(1000, 999, corr); }
+    const r = rng(lseed), ix = shuffleIdx(300, r);
+    lab = [...ix.filter(i => D.y[i] === 0).slice(0, 2), ...ix.filter(i => D.y[i] === 1).slice(0, 2)];
+    S1 = new Map(lab.map(i => [i, D.y[i]])); S2 = new Map(lab.map(i => [i, D.y[i]])); R1 = new Map(); R2 = new Map();
+    w1 = fit(D.A, S1); w2 = fit(D.B, S2); round = 0; added = 0; wrong = 0; hist = [evaluate()]; draw();
+  }
+  function step() {
+    const c1 = [], c2 = [], hi = tau.v;
+    for (let i = 0; i < 300; i++) {
+      const p1 = pA(i), p2 = pB(i), k1 = Math.max(p1, 1 - p1), k2 = Math.max(p2, 1 - p2);
+      if (k1 >= hi && k2 < hi && !S2.has(i)) c2.push([k1, i, p1 >= .5 ? 1 : 0]);
+      if (k2 >= hi && k1 < hi && !S1.has(i)) c1.push([k2, i, p2 >= .5 ? 1 : 0]);
+    }
+    round++;
+    c2.sort((a, b) => b[0] - a[0]).slice(0, kS.v).forEach(([, i, l]) => { S2.set(i, l); R2.set(i, round); added++; wrong += l !== D.y[i]; });
+    c1.sort((a, b) => b[0] - a[0]).slice(0, kS.v).forEach(([, i, l]) => { S1.set(i, l); R1.set(i, round); added++; wrong += l !== D.y[i]; });
+    w1 = fit(D.A, S1); w2 = fit(D.B, S2); hist.push(evaluate()); draw();
+    return c1.length + c2.length > 0;
+  }
+  function stop() { if (anim) clearTimeout(anim); anim = 0; $('#co-run').textContent = 'Run 15 rounds'; }
+  $('#co-run').addEventListener('click', () => {
+    if (anim) { stop(); return; }
+    $('#co-run').textContent = 'Pause'; let left = 15;
+    const tick = () => { const more = step(); left--; if (more && left > 0) anim = setTimeout(tick, 200); else stop(); };
+    tick();
+  });
+  $('#co-step').addEventListener('click', () => { stop(); step(); });
+  $('#co-reset').addEventListener('click', () => reset());
+  $('#co-new').addEventListener('click', () => { lseed++; reset(); });
+  segm('co-views', v => { corr = v === 'corr'; reset(true); });
+  function view(svg, V, w, S, R, which) {
+    clear(svg);
+    const f = plot2(svg, DOM), [gw, gh] = gridDims(f, 90); svg._f = f;
+    const P = evalGrid(DOM, gw, gh, (x, y) => sigm(w[0] + w[1] * x + w[2] * y));
+    field(svg, f, P, gw, gh); contour(svg, f, P, gw, gh, .5); border(svg, f);
+    const ls = new Set(lab);
+    V.forEach((p, i) => {
+      if (ls.has(i)) return; const x = f.X(p[0]), y = f.Y(p[1]);
+      if (S.has(i)) { hollow(svg, x, y, S.get(i), 3.4); if (R.get(i) === round) ring(svg, x, y, 6.5, 'var(--mi)'); }
+      else unlab(svg, x, y, 2.3);
+    });
+    lab.forEach(i => bigMark(svg, f.X(V[i][0]), f.Y(V[i][1]), D.y[i], 7));
+    if (hov >= 0) { const x = f.X(V[hov][0]), y = f.Y(V[hov][1]); ring(svg, x, y, 10, 'var(--ink)'); }
+    txt(svg, f.L + 6, f.T + 14, which, 'lbl halo', { fill: 'var(--ink)' });
+  }
+  function draw() {
+    view(sa, D.A, w1, S1, R1, 'view 1: x⁽¹⁾'); view(sb, D.B, w2, S2, R2, 'view 2: x⁽²⁾');
+    const h = hist[hist.length - 1];
+    $('#co-stats').innerHTML = stat('round', round) + stat('f₁ accuracy', pct(h[0]), 'a') + stat('f₂ accuracy', pct(h[1])) + stat('both (sum of log odds)', pct(h[2]), 'm') + stat('|S₁|, |S₂|', S1.size + ', ' + S2.size) + stat('transferred labels correct', added ? pct(1 - wrong / added) : '—', 'g');
+    $$('#co-stats .stat')[2].querySelector('.v').style.color = 'var(--c5)';
+    lineChart(cur, { x: [0, Math.max(10, round)], y: [0.4, 1], yt: [.4, .6, .8, 1], fy: v => (100 * v).toFixed(0) + '%', xl: 'round', series: [
+      { pts: hist.map((r, k) => [k, r[0]]), col: 'var(--c3)', dots: 1 }, { pts: hist.map((r, k) => [k, r[1]]), col: 'var(--c5)', dots: 1 }, { pts: hist.map((r, k) => [k, r[2]]), col: 'var(--mi)', dots: 1 }] });
+    if (hov >= 0) {
+      const p1 = pA(hov), p2 = pB(hov), st = (S, R, who) => S.has(hov) ? (R.has(hov) ? `taught by ${who} in round ${R.get(hov)}` : 'labeled') : 'not in its set';
+      $('#co-hov').textContent = `point ${hov}, true class ${D.y[hov] ? 'B' : 'A'}. f₁: p(B) = ${f2(p1)} (${st(S1, R1, 'f₂')}). f₂: p(B) = ${f2(p2)} (${st(S2, R2, 'f₁')}).`;
+    }
+  }
+  [[sa, 'A'], [sb, 'B']].forEach(([s, k]) => s.addEventListener('pointermove', e => { const f = s._f; if (!f) return; const i = nearestPt(s, f, D[k], e, 10); if (i !== hov && i >= 0) { hov = i; draw(); } }));
+  reset(true); renderers.push(draw);
+})();
+
+/* ================= §19.3.3 tri-training ================= */
+(function () {
+  const D = moons(300, 0.12, 21), T = moons(400, 0.12, 99);
+  const F = D.X.map(p => feat(MS, p[0], p[1])), FT = T.X.map(p => feat(MS, p[0], p[1]));
+  let seed = 5, lab, boots, W, add, round, hist;
+  const tau = slider('tri-tau', v => v.toFixed(2));
+  const fitK = k => { const idx = [...boots[k], ...add[k].map(s => s[0])], ys = [...boots[k].map(i => D.y[i]), ...add[k].map(s => s[1])]; return fitIdx(F, idx, ys); };
+  function evaluate() {
+    const acc = W.map(w => predAcc(FT, w, T.y));
+    let v = 0; FT.forEach((f, i) => { const s = W.reduce((a, w) => a + (dot(w, f) >= 0 ? 1 : 0), 0); v += (s >= 2 ? 1 : 0) === T.y[i]; });
+    let agree = 0; F.forEach(f => { const s = W.reduce((a, w) => a + (dot(w, f) >= 0 ? 1 : 0), 0); agree += s === 0 || s === 3; });
+    return { acc, vote: v / FT.length, agree: agree / F.length };
+  }
+  function reset(newBoot) {
+    if (newBoot) seed++;
+    const r = rng(seed), ix = shuffleIdx(300, r);
+    lab = [...ix.filter(i => D.y[i] === 0).slice(0, 4), ...ix.filter(i => D.y[i] === 1).slice(0, 4)];
+    boots = [0, 1, 2].map(() => lab.map(() => lab[Math.floor(r() * lab.length)]));
+    add = [[], [], []]; W = [0, 1, 2].map(fitK); round = 0; hist = [evaluate()]; draw();
+  }
+  function step() {
+    const ls = new Set(lab), P = W.map(w => F.map(f => sigm(dot(w, f))));
+    add = [0, 1, 2].map(k => {
+      const [a, b] = [0, 1, 2].filter(j => j !== k), out = [];
+      for (let i = 0; i < 300; i++) { if (ls.has(i)) continue; const la = P[a][i] >= .5, lb = P[b][i] >= .5; if (la === lb && Math.max(P[a][i], 1 - P[a][i]) >= tau.v && Math.max(P[b][i], 1 - P[b][i]) >= tau.v) out.push([i, la ? 1 : 0]); }
+      return out;
+    });
+    W = [0, 1, 2].map(fitK); round++; hist.push(evaluate()); draw();
+  }
+  $('#tri-step').addEventListener('click', step);
+  $('#tri-reset').addEventListener('click', () => reset(false));
+  $('#tri-new').addEventListener('click', () => reset(true));
+  function draw() {
+    const h = hist[hist.length - 1];
+    [0, 1, 2].forEach(k => {
+      const svg = $('#tri-' + k); clear(svg);
+      const f = plot2(svg, MO.dom, 4), [gw, gh] = gridDims(f, 80), g = rbfGrid(MS, MO.dom, gw, gh), P = rbfP(g, W[k]);
+      field(svg, f, P, gw, gh); contour(svg, f, P, gw, gh, .5, { 'stroke-width': 2 }); border(svg, f);
+      const got = new Map(add[k]), ls = new Set(lab);
+      D.X.forEach((p, i) => { if (ls.has(i)) return; const x = f.X(p[0]), y = f.Y(p[1]); if (got.has(i)) hollow(svg, x, y, got.get(i), 2.6, { 'stroke-width': 1.2 }); else unlab(svg, x, y, 1.8); });
+      const cnt = new Map(); boots[k].forEach(i => cnt.set(i, (cnt.get(i) || 0) + 1));
+      for (const [i, c] of cnt) { const x = f.X(D.X[i][0]), y = f.Y(D.X[i][1]); bigMark(svg, x, y, D.y[i], 5.5); if (c > 1) txt(svg, x + 7, y - 6, '×' + c, 'lbl halo', { fill: 'var(--ink)' }); }
+      $('#tri-a' + k).textContent = 'test ' + pct(h.acc[k]);
+    });
+    const pa = add.map(s => s.length ? pct(s.filter(([i, l]) => l === D.y[i]).length / s.length) : '—');
+    $('#tri-stats').innerHTML = stat('round', round) + stat('majority vote, test', pct(h.vote), 'm') + stat('pseudo-labels received', add.map(s => s.length).join(' / ')) + stat('…of which correct', pa.join(' / '), 'g') + stat('unlabeled points all 3 agree on', pct(h.agree));
+    const say = $('#tri-say'), d = h.vote - hist[0].vote;
+    if (!round) { say.className = 'verdict'; say.textContent = `Round 0: three bootstrap models disagree on ${pct(1 - h.agree)} of the unlabeled points. Press Round.`; }
+    else if (h.agree > 0.995) { say.className = 'verdict meh'; say.textContent = `The three models now agree almost everywhere (vote ${pct(hist[0].vote)} → ${pct(h.vote)}). With no disagreement left, they have nothing more to teach each other.`; }
+    else { say.className = 'verdict ' + (d > 0.005 ? 'ok' : d < -0.005 ? 'bad' : ''); say.textContent = `Vote accuracy ${pct(hist[0].vote)} → ${pct(h.vote)}.`; }
+  }
+  reset(false); renderers.push(draw);
+})();
+
+/* ================= §19.3.4 label propagation ================= */
+(function () {
+  const svg = $('#lp-plot'), conv = $('#lp-conv');
+  const SETS = {
+    moons: () => moons(240, 0.08, 3), noisy: () => moons(240, 0.2, 3), circles: () => circles(240, 0.06, 3)
+  };
+  const ANCH = { moons: [[-1, 0.1], [2, 0.4]], noisy: [[-1, 0.1], [2, 0.4]], circles: [[1, 0], [0, 0.42]] };
+  let key = 'moons', D, G, cs, labels, Y, Ys, it, hist, lastD, jumped, anim = 0, hov = -1, indW = null, SP = null, nE = 0;
+  const kS = slider('lp-k', v => v, () => { rebuild(); }), sS = slider('lp-s', v => v.toFixed(2), () => { rebuild(); });
+  function load() {
+    D = SETS[key](); SP = rbfSpec(D.dom, 14, 10, 1.0);
+    labels = new Int8Array(D.X.length).fill(-1);
+    ANCH[key].forEach((a, c) => { let b = -1, bd = 1e9; D.X.forEach((p, i) => { if (D.y[i] !== c) return; const d = (p[0] - a[0]) ** 2 + (p[1] - a[1]) ** 2; if (d < bd) { bd = d; b = i; } }); labels[b] = c; });
+    rebuild();
+  }
+  function rebuild() {
+    stop(); G = knnGraph(D.X, kS.v, sS.v); cs = colSums(G); nE = G.reduce((s, m) => s + m.size, 0) / 2;
+    restart();
+  }
+  const dist = () => { let m = 0; for (let i = 0; i < Y.length; i++) m = Math.max(m, Math.abs(Y[i][1] - Ys[i][1])); return m; };
+  function restart() {
+    stop(); Ys = lpClosed(G, cs, Array.from(labels), 2); Y = lpInit(D.X.length, 2, Array.from(labels));
+    it = 0; lastD = NaN; jumped = false; hist = [[0, dist()]]; indW = null; draw();
+  }
+  function step(n) {
+    const lab = Array.from(labels);
+    for (let s = 0; s < n; s++) { const r = lpStep(G, cs, Y, lab, 2); Y = r.Y; lastD = r.dmax; it++; if (it % 2 === 0 || n < 5) hist.push([it, dist()]); if (r.dmax < 1e-9) break; }
+    indW = null;
+  }
+  function stop() { if (anim) cancelAnimationFrame(anim); anim = 0; $('#lp-run').textContent = 'Run'; }
+  $('#lp-step').addEventListener('click', () => { stop(); step(1); draw(); });
+  $('#lp-10').addEventListener('click', () => { stop(); step(10); draw(); });
+  $('#lp-run').addEventListener('click', () => {
+    if (anim) { stop(); draw(); return; }
+    $('#lp-run').textContent = 'Pause';
+    const tick = () => { step(it < 40 ? 1 : 6); draw(true); if (lastD > 1e-7 && it < 4000) anim = requestAnimationFrame(tick); else { stop(); draw(); } };
+    anim = requestAnimationFrame(tick);
+  });
+  $('#lp-jump').addEventListener('click', () => { stop(); Y = Ys.map(r => Float64Array.from(r)); jumped = true; hist.push([it, 0]); indW = null; draw(); });
+  $('#lp-reset').addEventListener('click', restart);
+  segm('lp-data', v => { key = v; hov = -1; load(); });
+  $('#lp-edges').addEventListener('change', () => draw()); $('#lp-ind').addEventListener('change', () => draw());
+  svg.addEventListener('click', e => {
+    const f = svg._f; if (!f) return; const i = nearestPt(svg, f, D.X, e, 12); if (i < 0) return;
+    labels[i] = labels[i] === -1 ? 0 : labels[i] === 0 ? 1 : -1; restart();
+  });
+  svg.addEventListener('pointermove', e => { const f = svg._f; if (!f) return; const i = nearestPt(svg, f, D.X, e, 10); if (i !== hov) { hov = i; if (!anim) draw(); } });
+  function draw(fast) {
+    clear(svg);
+    const f = plot2(svg, D.dom); svg._f = f;
+    if ($('#lp-ind').checked) {
+      const [gw, gh] = gridDims(f, 110), g = rbfGrid(SP, D.dom, gw, gh);
+      if (!indW && !fast) { const n = D.X.length, Fs = D.X.map(p => feat(SP, p[0], p[1])); indW = fitLogit(Fs, Y.map(r => r[1]), new Array(n).fill(1), LAM); }
+      if (indW) { const P = rbfP(g, indW); field(svg, f, P, gw, gh); contour(svg, f, P, gw, gh, .5); }
+    }
+    border(svg, f);
+    if ($('#lp-edges').checked) {
+      let strong = '', weak = '';
+      G.forEach((m, i) => { for (const [j, w] of m) if (j > i) { const s = `M${f.X(D.X[i][0]).toFixed(1)},${f.Y(D.X[i][1]).toFixed(1)}L${f.X(D.X[j][0]).toFixed(1)},${f.Y(D.X[j][1]).toFixed(1)}`; if (w > .5) strong += s; else weak += s; } });
+      el('path', { d: weak, stroke: 'var(--muted)', 'stroke-width': .7, opacity: .22, fill: 'none' }, svg);
+      el('path', { d: strong, stroke: 'var(--muted)', 'stroke-width': 1.1, opacity: .5, fill: 'none' }, svg);
+    }
+    if (hov >= 0) for (const [j] of G[hov]) el('line', { x1: f.X(D.X[hov][0]), y1: f.Y(D.X[hov][1]), x2: f.X(D.X[j][0]), y2: f.Y(D.X[j][1]), stroke: 'var(--ink)', 'stroke-width': 1.6 }, svg);
+    D.X.forEach((p, i) => { if (labels[i] >= 0) return; el('circle', { cx: f.X(p[0]), cy: f.Y(p[1]), r: 3.6, fill: mixCol(Y[i][1]), stroke: 'var(--surface)', 'stroke-width': .8 }, svg); });
+    D.X.forEach((p, i) => { if (labels[i] >= 0) bigMark(svg, f.X(p[0]), f.Y(p[1]), labels[i], 7.5); });
+    if (hov >= 0) ring(svg, f.X(D.X[hov][0]), f.Y(D.X[hov][1]), 8, 'var(--ink)');
+    let acc = 0, nu = 0, nl = 0; Y.forEach((r, i) => { if (labels[i] >= 0) { nl++; return; } nu++; acc += (r[1] > r[0] ? 1 : 0) === D.y[i]; });
+    $('#lp-cap').textContent = `${D.X.length} nodes, ${nE} edges, ${nl} labeled`;
+    $('#lp-stats').innerHTML = stat('iteration', it + (jumped ? ' → Y*' : '')) + stat('accuracy (unlabeled)', pct(acc / nu), 'm') + stat('max |ΔY| last step', isFinite(lastD) ? lastD.toExponential(1) : '—') + stat('max |Y − Y*|', jumped ? '0' : dist().toExponential(1), 'b');
+    if (hov >= 0) {
+      let rs = 0; for (const [j, w] of G[hov]) rs += w / cs[j];
+      const nb = [...G[hov]].map(([j, w]) => [j, w / cs[j] / rs]).sort((a, b) => b[1] - a[1]).slice(0, 4);
+      $('#lp-hov').textContent = labels[hov] >= 0 ? `node ${hov} is labeled ${labels[hov] ? 'B' : 'A'} (clamped). Click to cycle its label.` :
+        `node ${hov} (truly ${D.y[hov] ? 'B' : 'A'}): Y_B = ${f3(Y[hov][1])} = Σ T̄ᵢⱼ Y_jB over ${G[hov].size} neighbors. Largest: ` + nb.map(([j, t]) => `T̄=${t.toFixed(2)}·${f2(Y[j][1])}`).join(', ');
+    }
+    const xm = Math.max(50, it * 1.05);
+    const cf = lineChart(conv, { x: [0, xm], y: [-8, 0], yt: [-8, -6, -4, -2, 0], fy: v => v === 0 ? '1' : '1e' + neg(v), xl: 'iteration', series: [{ pts: hist.filter(h => h[1] > 0).map(h => [h[0], Math.log10(h[1])]), col: 'var(--mi)' }] });
+    if (jumped) { el('circle', { cx: cf.X(Math.min(it, xm)), cy: cf.Y(-8), r: 5, fill: 'var(--muted)' }, conv); txt(conv, cf.X(Math.min(it, xm)) - 8, cf.Y(-8) - 8, 'jumped to Y*', 'ax', { 'text-anchor': 'end' }); }
+  }
+  load(); renderers.push(() => draw());
+})();
+
+/* ---------- quiz ---------- */
+const QUIZ = {
+  ssl: [
+    { l: 'Kid', q: 'In the seashell story, what do the shells without names help you see?', o: ['That the shells fall into piles', 'The names of the shells', 'Which shell is the biggest', 'Nothing at all'], a: 0, w: 'Unlabeled data shows the structure (the piles). The few labels say which pile is which.' },
+    { l: 'HS', q: 'Why is unlabeled data usually much easier to get than labeled data?', o: ['Collecting inputs is cheap; writing down the right answers takes people, time and sometimes experts', 'Unlabeled data is always smaller', 'Labels are illegal to collect', 'Computers cannot read labels'], a: 0, w: 'Recording speech is cheap, transcribing it is slow. Medical labels may need a doctor.' },
+    { l: 'Undergrad', q: 'Semi-supervised learning assumes we have samples from p(x, y) and also from…', o: ['the marginal p(x)', 'the marginal p(y)', 'the posterior p(θ | D)', 'the conditional p(x | y) for each class'], a: 0, w: 'Unlabeled inputs are draws from p(x) (Fig. 19.8), usually many more of them than labeled pairs.' },
+    { l: 'Undergrad', q: 'Unlabeled points can only improve p(y | x) if…', o: ['we assume something linking p(x) to p(y | x), like the cluster or manifold assumption', 'there are more unlabeled than labeled points', 'the model is linear', 'the labels are noisy'], a: 0, w: 'Without such a link, p(x) says nothing about how y depends on x.' },
+    { l: 'HS', q: 'In the Play box with 1–2 labels per class, why does label propagation beat the supervised model?', o: ['It uses the unlabeled points to follow each moon\'s shape', 'It has more parameters', 'It was given extra labels', 'It uses a deeper network'], a: 0, w: 'Labels spread along chains of nearby points, which trace each moon.' },
+    { l: 'Grad', q: 'If a discriminative model\'s parameters θ are a priori independent of the input-model parameters μ, then unlabeled data…', o: ['does not change the posterior over θ', 'always improves θ', 'makes θ unidentifiable', 'acts like extra labeled data'], a: 0, w: 'Seeger\'s argument: p(θ | D_L, D_U) = p(θ | D_L). SSL methods must couple the two somehow.' }
+  ],
+  st: [
+    { l: 'Kid', q: 'What is "confirmation bias" in self-training?', o: ['Learning your own mistakes more and more strongly', 'Asking a teacher to confirm every answer', 'Being too careful to guess', 'Getting every answer right'], a: 0, w: 'Wrong pseudo-labels become training targets, so the model "confirms" its error.' },
+    { l: 'HS', q: 'What is a pseudo-label?', o: ['The model\'s own prediction for an unlabeled point, used as if it were a label', 'A label written by an expert', 'A random label', 'A label that is always correct'], a: 0, w: 'It is only "pseudo-correct" compared with a true ground-truth label [Lee13].' },
+    { l: 'HS', q: 'With two classes, a threshold τ = 0.5 on the top class probability…', o: ['keeps every pseudo-label, mistakes included', 'keeps none of them', 'keeps only perfectly confident ones', 'keeps half at random'], a: 0, w: 'The larger of p and 1 − p is always at least 0.5.' },
+    { l: 'Undergrad', q: 'What is the drawback of offline self-training compared with online?', o: ['Pseudo-labels can go stale, because they are only updated after the model converges', 'It costs more to re-label constantly', 'It cannot use a threshold', 'It only works for linear models'], a: 0, w: 'Online re-labels every batch (fresh labels, more compute). Offline re-labels once per convergence.' },
+    { l: 'Undergrad', q: 'A confidence threshold only keeps mostly-correct pseudo-labels if the model\'s probabilities are…', o: ['well calibrated', 'all equal', 'below 0.5', 'computed on the labeled set'], a: 0, w: 'If p = 0.95 really means right 95% of the time, the kept labels are mostly right.' },
+    { l: 'Undergrad', q: 'Offline self-training stops changing when…', o: ['refitting reproduces exactly the pseudo-labels it was trained on', 'all points are labeled correctly', 'τ reaches 1', 'the labeled set is empty'], a: 0, w: 'That is a fixed point, whether the labels are right or wrong.' },
+    { l: 'Grad', q: 'FixMatch is best described as…', o: ['online pseudo-labeling with a confidence threshold, using weak augmentations for labels and strong ones for training', 'offline self-training with a bigger student', 'label propagation on embeddings', 'co-training with two networks'], a: 0, w: 'Sohn et al. (2020): pseudo-label the weak view if max p ≥ τ (0.95), and train on the strongly augmented view.' }
+  ],
+  em: [
+    { l: 'Kid', q: 'Which answer has the most entropy?', o: ['"50% cat, 50% dog"', '"100% cat"', '"90% cat, 10% dog"', '"100% dog"'], a: 0, w: 'Entropy measures the shrug: an even split is the biggest one.' },
+    { l: 'HS', q: 'For two classes, the largest possible entropy (in nats) is…', o: ['ln 2 ≈ 0.69', '1', '0', '2'], a: 0, w: 'At p = ½: −2 · ½ ln ½ = ln 2.' },
+    { l: 'Undergrad', q: 'Online self-training (Eq. 19.16) is cross-entropy against…', o: ['a one-hot target at the model\'s own argmax', 'the model\'s own soft prediction', 'the uniform distribution', 'the true label'], a: 0, w: '−max_c log p_c = −log p_ĉ: cross-entropy with a hard target.' },
+    { l: 'Undergrad', q: 'Entropy minimization (Eq. 19.17) is cross-entropy against…', o: ['the model\'s own soft prediction p', 'a one-hot target', 'the labeled-class frequencies', 'nothing; it is not a cross-entropy'], a: 0, w: 'H(p) = −Σ p_c log p_c = H(p, p).' },
+    { l: 'Undergrad', q: 'Sharpening q_c ∝ p_c^(1/T) with T → 0 gives…', o: ['hard self-training', 'entropy minimization', 'a uniform target', 'no loss at all'], a: 0, w: 'T = 1 is entropy minimization. As T → 0, q becomes one-hot at the argmax.' },
+    { l: 'HS', q: 'Where do all three losses in Fig. 19.9 reach their maximum?', o: ['At logit z = 0, where p = ½', 'At z = 8', 'At z = −8', 'They have no maximum'], a: 0, w: 'All equal ln 2 at z = 0 and decrease as |z| grows.' },
+    { l: 'Grad', q: 'With a stop-gradient on the target, the gradient of H(q, p) w.r.t. the logits is p − q. What happens at T = 1?', o: ['The gradient is zero, so sharpening at T = 1 does nothing', 'It equals the entropy gradient', 'It doubles', 'It is undefined'], a: 0, w: 'q = p, so p − q = 0. Real entropy minimization backpropagates through both copies of p.' }
+  ],
+  cl: [
+    { l: 'Kid', q: 'Where should the fence between two herds of sheep go?', o: ['In the empty field between the herds', 'Through the middle of the bigger herd', 'Around all the sheep', 'Anywhere, it doesn\'t matter'], a: 0, w: 'Few sheep near the fence means few unsure sheep.' },
+    { l: 'HS', q: 'The cluster assumption says the decision boundary should be…', o: ['in a low-density region, between clusters', 'through the densest region', 'parallel to an axis', 'as close to the labeled points as possible'], a: 0, w: 'Classes form clusters, so a good boundary separates them.' },
+    { l: 'Undergrad', q: 'Why does a smooth classifier with its boundary through a dense cluster have high mean entropy?', o: ['Many points sit near the boundary, where predictions are close to 50/50', 'Smooth classifiers are always uncertain', 'The labeled loss is high', 'Entropy depends only on ‖w‖'], a: 0, w: 'Smoothness means p changes gradually, so points near the boundary get high entropy.' },
+    { l: 'Undergrad', q: 'What degenerate solution does pure entropy minimization have?', o: ['Move the boundary off the data so every point is confidently one class', 'Predict 50/50 everywhere', 'Set w = 0', 'Memorize the labeled points'], a: 0, w: 'Everything confident gives entropy ≈ 0. The labeled loss and the balance term H(p̄) prevent it.' },
+    { l: 'Undergrad', q: 'Besides moving the boundary, a linear model can lower entropy by…', o: ['scaling up ‖w‖ so every logit gets bigger', 'shrinking ‖w‖ to zero', 'removing the bias', 'adding more labeled points'], a: 0, w: 'Larger logits mean more confident predictions everywhere. That is why the demo has weight decay.' },
+    { l: 'Grad', q: 'The transductive SVM\'s analogue of the entropy penalty is…', o: ['a hinge loss on unlabeled points, max(0, 1 − |f(x)|)', 'the squared loss on unlabeled points', 'a KL to the prior', 'label propagation'], a: 0, w: 'Both push unlabeled points away from the boundary (low-density separation). TSVMs also need a class-balance constraint.' }
+  ],
+  mi: [
+    { l: 'Kid', q: 'Why isn\'t "everything is in box 1, totally sure!" a good answer?', o: ['Being sure doesn\'t help if every box but one is empty', 'Box 1 is always wrong', 'The model is never allowed to be sure', 'It is a good answer'], a: 0, w: 'The mutual-information rule also requires the boxes to be used.' },
+    { l: 'HS', q: 'Mutual information here equals…', o: ['entropy of the average prediction minus the average of the entropies', 'the average of the entropies', 'the entropy of the labels', 'the accuracy'], a: 0, w: 'I = H(p̄) − E[H(p)].' },
+    { l: 'Undergrad', q: 'In Eq. 19.25, the first term (−E[Σ p log p]) is…', o: ['the entropy-minimization loss, in expectation', 'the negative entropy of p̄', 'the labeled cross-entropy', 'always zero'], a: 0, w: 'The book: "The first term is exactly the entropy minimization objective in expectation."' },
+    { l: 'Undergrad', q: 'Minimizing the second term, Σ p̄ᵢ log p̄ᵢ, pushes the model to…', o: ['predict every class equally often on average', 'predict one class always', 'be less confident per point', 'ignore unlabeled data'], a: 0, w: 'It is −H(p̄), so minimizing it maximizes the entropy of the average prediction.' },
+    { l: 'Undergrad', q: 'When is that balance term inappropriate as written?', o: ['When the classes are known to be unbalanced', 'When there are only two classes', 'When the model is linear', 'Always'], a: 0, w: 'It assumes all classes are equally likely a priori. Use KL(p̄ ‖ π) for a known prior π.' },
+    { l: 'HS', q: 'With three classes, the largest possible value of I is…', o: ['ln 3 ≈ 1.10', '1', '3', 'ln 2'], a: 0, w: 'I ≤ H(p̄) ≤ ln 3, reached with confident and balanced predictions.' },
+    { l: 'Grad', q: 'Why is H(p̄) awkward to estimate on a small mini-batch?', o: ['It is a nonlinear function of a mean, so the batch estimate is biased', 'It is always zero', 'It needs the labels', 'It requires second derivatives'], a: 0, w: 'Small batches can\'t represent all classes. Large batches or running averages of p̄ are used.' }
+  ],
+  co: [
+    { l: 'Kid', q: 'Why can the "eyes" friend and the "ears" friend help each other?', o: ['They use different clues, so they get confused by different animals', 'They always agree', 'One of them knows every answer', 'They both only see'], a: 0, w: 'Different views fail on different examples.' },
+    { l: 'HS', q: 'In co-training, a pseudo-labeled point is added to a model\'s training set when…', o: ['the other model is confident about it and this model is not', 'both models are unsure', 'both models are confident', 'it is randomly chosen'], a: 0, w: 'Low entropy from one model, high entropy from the other: the confident one teaches.' },
+    { l: 'Undergrad', q: 'Co-training\'s two key assumptions about the views are…', o: ['each is sufficient to classify, and they are conditionally independent given y', 'they are identical', 'they have the same number of features', 'one view is labeled and the other is not'], a: 0, w: 'The book: "two informative-but-independent views."' },
+    { l: 'Undergrad', q: 'Switch the demo to correlated views. Why does co-training stall?', o: ['Points hard for one view are hard for the other, so few useful, correct labels transfer', 'The models become nonlinear', 'There are fewer points', 'τ is ignored'], a: 0, w: 'Without independence, "confident in one, unsure in the other" is rare and error-prone.' },
+    { l: 'Undergrad', q: 'How does tri-training make its three models different?', o: ['Each is trained on a bootstrap sample (with replacement) of the labeled data', 'Each uses a different view', 'Each sees different classes', 'Each uses a different loss'], a: 0, w: 'Different samples mean they don\'t always agree, which gives them something to teach.' },
+    { l: 'HS', q: 'In tri-training, model 3 gets a pseudo-label for x when…', o: ['models 1 and 2 agree on x', 'model 3 is confident', 'all three disagree', 'x is labeled'], a: 0, w: 'Two-agree-teach-the-third acts as a selection metric.' },
+    { l: 'Grad', q: 'Why does conditional independence make co-training\'s transferred labels useful?', o: ['Given y, the receiving view\'s features are a random draw, so selection by the other view adds no bias', 'It makes both views identical', 'It guarantees zero label noise', 'It makes the models linear'], a: 0, w: 'Blum & Mitchell\'s PAC argument: the transfer acts like (noisy) random labeled examples for the other view.' }
+  ],
+  lp: [
+    { l: 'Kid', q: 'In the ink-and-strings story, why doesn\'t ink jump across the gap between the moons?', o: ['There are no strings across the gap', 'Ink is too heavy', 'The gap is colored already', 'It does jump'], a: 0, w: 'Labels only flow along graph edges, and kNN edges follow each moon.' },
+    { l: 'HS', q: 'One step of label propagation sets each unlabeled point\'s label mix to…', o: ['a weighted average of its neighbors\' mixes', 'the label of the nearest labeled point', 'a random class', '50/50'], a: 0, w: 'Weights come from similarity. Labeled points are then reset to their true label.' },
+    { l: 'Undergrad', q: 'T_ij = w_ij / Σ_k w_kj is normalized over…', o: ['column j: how node j\'s label is split among the nodes it propagates to', 'row i', 'the whole matrix', 'the labeled nodes only'], a: 0, w: 'Eq. 19.26: T_ij is the probability of propagating node j\'s label to node i.' },
+    { l: 'Undergrad', q: 'After the iteration converges, how is the guessed label chosen?', o: ['The class with the highest probability in that row of Y', 'The class of the nearest labeled point', 'A vote of the neighbors\' true labels', 'The first column of Y'], a: 0, w: 'ŷᵢ = argmax_c Y_ic.' },
+    { l: 'Undergrad', q: 'The fixed point mainly costs…', o: ['inverting the unlabeled-to-unlabeled transition block (I − T̄_UU)', 'sorting the labels', 'one pass over the labeled points', 'training a neural net'], a: 0, w: 'Y_U = (I − T̄_UU)⁻¹ T̄_UL Y_L [ZG02].' },
+    { l: 'HS', q: 'Why is label propagation called transductive?', o: ['It only labels the given unlabeled points, rather than learning a model for new inputs', 'It transfers labels between tasks', 'It uses transformers', 'It needs a test set'], a: 0, w: 'Train any classifier on the propagated labels to get an inductive model.' },
+    { l: 'Undergrad', q: 'On "Moons," raising k from 8 to 30 tends to…', o: ['add edges across the classes, so labels leak into the wrong moon', 'always improve accuracy', 'have no effect', 'disconnect the graph'], a: 0, w: 'The method lives or dies by the similarity graph.' },
+    { l: 'Grad', q: 'In the random-walk view, Y_ic at the fixed point is…', o: ['the probability that a walk from i is first absorbed at a class-c labeled node', 'the number of class-c neighbors', 'the distance to the nearest class-c node', 'the stationary probability of node i'], a: 0, w: 'Make labeled nodes absorbing in the row-stochastic T̄. The fixed point gives the absorption probabilities.' }
+  ]
+};
+
+/* ---------- levels ---------- */
+const LEVELS = { 1: 'Kid', 2: 'High school', 3: 'Undergrad', 4: 'Grad / MLE' };
+let level = 3;
+try { const s = localStorage.getItem('ssl-lab-level'); if (s && LEVELS[s]) level = +s; } catch (e) {}
+$$('[data-lv]').forEach(card => {
+  const kids = [...card.children];
+  const tabs = document.createElement('div'); tabs.className = 'lvtabs'; tabs.setAttribute('role', 'tablist');
+  tabs.innerHTML = Object.entries(LEVELS).map(([k, v]) => `<button role="tab" data-tab="${k}">${v}</button>`).join('');
+  const body = document.createElement('div'); body.className = 'lvbody';
+  kids.forEach(k => body.appendChild(k));
+  card.appendChild(tabs); card.appendChild(body);
+  tabs.addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) showCard(card, +b.dataset.tab); });
+});
+function showCard(card, l) {
+  $$('.lvbody > [data-l]', card).forEach(d => { d.hidden = +d.dataset.l !== l; });
+  $$('[data-tab]', card).forEach(b => { b.classList.toggle('on', +b.dataset.tab === l); b.setAttribute('aria-selected', +b.dataset.tab === l); });
+}
+function setLevel(l) {
+  level = l; try { localStorage.setItem('ssl-lab-level', l); } catch (e) {}
+  $$('[data-lv]').forEach(c => showCard(c, l));
+  $$('[data-setl]').forEach(b => b.classList.toggle('on', +b.dataset.setl === l));
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-setl]'); if (b) setLevel(+b.dataset.setl); });
+setLevel(level);
+
+/* ---------- score ---------- */
+const SCORE = { right: 0, total: 0, paint() { $('#score').innerHTML = `Quiz <b>${this.right}</b> / ${this.total}`; } };
+(function () {
+  $$('[data-quiz]').forEach(box => {
+    const qs = QUIZ[box.dataset.quiz]; SCORE.total += qs.length;
+    let local = 0;
+    const order = q => { let h = 0; for (const ch of q.q) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); const r = rng(h), ix = q.o.map((_, j) => j); for (let j = ix.length - 1; j > 0; j--) { const k = Math.floor(r() * (j + 1)); [ix[j], ix[k]] = [ix[k], ix[j]]; } return ix; };
+    function build() {
+      box.innerHTML = qs.map((q, i) => `<div class="qq" data-i="${i}"><p class="qt"><span class="qn">Q${i + 1}</span>${q.q}<span class="ql">${q.l}</span></p><div class="opts">${order(q).map(j => `<button class="opt" data-j="${j}">${q.o[j]}</button>`).join('')}</div></div>`).join('') +
+        `<div class="quizfoot"><span class="qs">0 / ${qs.length} correct</span><button class="b qreset">Reset these questions</button></div>`;
+    }
+    build();
+    box.addEventListener('click', e => {
+      if (e.target.closest('.qreset')) { SCORE.right -= local; local = 0; build(); SCORE.paint(); return; }
+      const b = e.target.closest('.opt'); if (!b || b.disabled) return;
+      const card = b.closest('.qq'), q = qs[+card.dataset.i], ok = +b.dataset.j === q.a;
+      $$('.opt', card).forEach(x => { x.disabled = true; if (+x.dataset.j === q.a) x.classList.add('right'); });
+      if (!ok) b.classList.add('wrong');
+      card.insertAdjacentHTML('beforeend', `<p class="why-ans"><b class="${ok ? 'ok' : 'no'}">${ok ? 'Correct.' : 'Not quite.'}</b> ${q.w}</p>`);
+      if (ok) { local++; SCORE.right++; }
+      $('.qs', box).textContent = `${local} / ${qs.length} correct`;
+      SCORE.paint();
+    });
+  });
+  SCORE.paint();
+})();
+
+/* ---------- rail highlight + theme changes ---------- */
+(function () {
+  const links = $$('#rail a'), secs = links.map(a => $(a.getAttribute('href')));
+  const io = new IntersectionObserver(es => {
+    es.forEach(e => { if (e.isIntersecting) links.forEach(l => l.classList.toggle('on', l.getAttribute('href') === '#' + e.target.id)); });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  secs.forEach(s => s && io.observe(s));
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => renderers.forEach(f => f()));
+})();
+
+})();
+</script>
+</body>
+</html>
