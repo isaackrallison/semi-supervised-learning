@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Semi-Supervised Learning Lab</title>
-<meta name="description" content="Interactive study guide for §19.3–19.3.4 of Murphy's Probabilistic Machine Learning: semi-supervised learning, self-training and pseudo-labeling, confirmation bias, entropy minimization, the cluster assumption, input-output mutual information, co-training, tri-training and label propagation on graphs. Explanations at four levels, from elementary school to grad-level ML.">
+<meta name="description" content="Interactive study guide for §19.3–19.3.5 of Murphy's Probabilistic Machine Learning: semi-supervised learning, self-training and pseudo-labeling, confirmation bias, entropy minimization, the cluster assumption, input-output mutual information, co-training, tri-training label propagation on graphs and consistency regularization (VAT). Explanations at four levels, from elementary school to grad-level ML.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -260,7 +260,7 @@ footer { padding-block: 32px; color: var(--muted); font-size: 14px; }
 <div class="topbar"><div class="topbar-in">
   <div class="brand">Semi-Supervised <span>Learning</span> Lab</div>
   <div class="chips">
-    <a href="#ssl">19.3</a><a href="#st">19.3.1</a><a href="#em">19.3.2</a><a href="#cl">19.3.2.1</a><a href="#mi">19.3.2.2</a><a href="#co">19.3.3</a><a href="#lp">19.3.4</a><a href="#cheat">Sheet</a>
+    <a href="#ssl">19.3</a><a href="#st">19.3.1</a><a href="#em">19.3.2</a><a href="#cl">19.3.2.1</a><a href="#mi">19.3.2.2</a><a href="#co">19.3.3</a><a href="#lp">19.3.4</a><a href="#cr">19.3.5</a><a href="#cheat">Sheet</a>
   </div>
   <div class="tb-right">
     <div class="lvpick" id="lvpick" role="group" aria-label="Explanation level">
@@ -279,15 +279,16 @@ footer { padding-block: 32px; color: var(--muted); font-size: 14px; }
   <a href="#mi"><span class="n">19.3.2.2</span>Input-output mutual information</a>
   <a href="#co"><span class="n">19.3.3</span>Co-training and tri-training</a>
   <a href="#lp"><span class="n">19.3.4</span>Label propagation on graphs</a>
+  <a href="#cr"><span class="n">19.3.5</span>Consistency regularization</a>
   <a href="#cheat"><span class="n">—</span>Cheat sheet</a>
 </nav></aside>
 
 <main>
 <header class="hero">
-  <div class="eyebrow">Murphy, <i>Probabilistic Machine Learning</i> · Chapter 19 · §19.3 – §19.3.4</div>
+  <div class="eyebrow">Murphy, <i>Probabilistic Machine Learning</i> · Chapter 19 · §19.3 – §19.3.5</div>
   <h1>Six labels, three hundred <span class="m">unlabeled points</span>. Let the shape of the data do the rest.</h1>
   <p class="lede">Labels are expensive. Transcribing an hour of speech takes many hours, and a medical image may need a doctor. Unlabeled inputs are cheap. <b>Semi-supervised learning</b> (§19.3) uses lots of unlabeled \(\mathbf x\sim p(\mathbf x)\) to learn the overall shape of the data, and only a few labeled pairs \((\mathbf x,y)\sim p(\mathbf x,y)\) to say which part is which class.</p>
-  <p class="lede">This lab covers four ways to do that. In <b>self-training</b> the model labels the data for itself (19.3.1). <b>Entropy minimization</b> pushes the model toward confident predictions, which moves its boundary into the gaps between clusters (19.3.2). In <b>co-training</b> and tri-training, two or three models label data for each other (19.3.3). <b>Label propagation</b> lets labels flow along a similarity graph (19.3.4). Every model on the page is trained live in your browser.</p>
+  <p class="lede">This lab covers five ways to do that. In <b>self-training</b> the model labels the data for itself (19.3.1). <b>Entropy minimization</b> pushes the model toward confident predictions, which moves its boundary into the gaps between clusters (19.3.2). In <b>co-training</b> and tri-training, two or three models label data for each other (19.3.3). <b>Label propagation</b> lets labels flow along a similarity graph (19.3.4). <b>Consistency regularization</b> asks for the same prediction when the input is perturbed (19.3.5). Every model on the page is trained live in your browser.</p>
   <p class="lede">Every section has four parts: <b>Explain it</b> at your level, <b>Play</b>, <b>Math, slowly</b>, and <b>Check yourself</b>. Your quiz score sits in the top bar.</p>
   <div class="levelcards" id="levelcards">
     <button data-setl="1"><b>Kid</b><span>Elementary school. Stories, no symbols.</span></button>
@@ -885,6 +886,112 @@ footer { padding-block: 32px; color: var(--muted); font-size: 14px; }
   <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Label propagation</h3><div class="quizbox" data-quiz="lp"></div></div>
 </section>
 
+<!-- ============ 19.3.5 ============ -->
+<section class="sec" id="cr">
+  <div class="sec-head"><span class="secnum">§19.3.5</span><h2>Consistency regularization: a small nudge shouldn't change the answer</h2></div>
+  <div class="intro">
+    <p>Perturbing an input (or the model) a little shouldn't change the model's output much. Checking that needs only the model's outputs and no labels, so it works on unlabeled data. This idea began as "learning with pseudo-ensembles" [BAP14], soon followed by [LA16; SJT16]. Sample a perturbed copy \(\mathbf x'\sim q(\mathbf x'\mid\mathbf x)\), for example with augmentation, noise or dropout, and penalize any change in the prediction:</p>
+    <p>\[ \mathcal L(\theta)=-\sum_{i=1}^M\log p_\theta(y=y_i\mid\mathbf x_i)+\lambda\sum_{j=1}^N\big\|p_\theta(y\mid\mathbf x_j)-p_\theta(y\mid\mathbf x_j')\big\|^2. \qquad (19.27) \]</p>
+    <p>The clean prediction \(p_\theta(y\mid\mathbf x_j)\) is usually treated as a fixed target, with no gradient through it. There are three main design choices. The first is \(\lambda\): too large and the model reinforces its own bad early predictions, so it is usually <b>ramped up from 0</b>. The second is \(q(\mathbf x'\mid\mathbf x)\): it must not change the label. Strong augmentations work well, and <b>virtual adversarial training</b> (VAT) picks the perturbation that changes the output most. The third is the distance: squared error (the Brier score) or KL divergence.</p>
+  </div>
+
+  <div class="block lv"><h3 class="blabel"><span class="tag">Explain it</span>At your level</h3>
+    <div class="lvcard" data-lv>
+      <div data-l="1">
+        <p class="big">A cat is still a cat if you tilt the picture a little.</p>
+        <p>We don't know the right answer for most pictures. But we do know one rule: if you wiggle a picture slightly (tilt it, make it a bit blurry), the answer shouldn't change. So we show the model a picture and a wiggled copy, and give it a penalty if it gives two different answers.</p>
+        <p>Where are answers likely to flip when you wiggle? Right next to the line between "cat" and "dog." So following this rule pushes that line away from the pictures, into empty space. That's the same "put the fence in the empty field" idea from before.</p>
+        <p>Two warnings. Don't wiggle so hard that the cat turns into something else. And at the start, when the model knows almost nothing, don't make this rule too important yet.</p>
+      </div>
+      <div data-l="2">
+        <p>For each unlabeled point \(x\), make a nearby copy \(x'\). In the demo that means adding a little random noise. Ask the model for its probabilities at both points, and add the squared difference to the loss. Labeled points still use the normal loss.</p>
+        <p>A smooth model only changes its answer quickly near its decision boundary. So "keep answers the same when I jiggle the data points" really means "keep the boundary away from the data points." On the two moons it slides the boundary into the gap, even for Draw B, where self-training failed.</p>
+        <p>Try a jiggle size σ that is too big, 0.6 or more. Now the copies of a point land in the <b>other</b> moon, so the label really does change, and the method falls apart. Good augmentations keep the label the same.</p>
+      </div>
+      <div data-l="3">
+        <ul>
+          <li><b>Stochasticity everywhere.</b> \(q(\mathbf x'\mid\mathbf x)\) can be augmentation (rotation, noise, crops), and the model itself can be stochastic (dropout, weight noise [Gra11]). The demo uses Gaussian input noise or VAT.</li>
+          <li><b>Stop-gradient.</b> Only \(p_\theta(y\mid\mathbf x')\) is moved toward \(p_\theta(y\mid\mathbf x)\). With binary outputs, the gradient of \(2(p-q')^2\) with respect to the perturbed logit \(z'\) is \(4(q'-p)\,q'(1-q')\). For \(\mathrm{KL}(p\,\|\,q')\) it is \(q'-p\).</li>
+          <li><b>λ ramp-up.</b> Early on the model is poor, and a large \(\lambda\) would make it match its own bad predictions (like confirmation bias). A common schedule is \(\lambda(t)=\lambda\,e^{-5(1-t/T)^2}\) for \(t\le T\) [LA16].</li>
+          <li><b>VAT</b> [Miy+18]: \(\boldsymbol\delta\approx\arg\max_{\boldsymbol\delta}\mathrm{KL}(p_\theta(y\mid\mathbf x)\,\|\,p_\theta(y\mid\mathbf x+\boldsymbol\delta))\). Sample \(\mathbf d\sim\mathcal N(0,\mathbf I)\), set \(\boldsymbol\delta\leftarrow\nabla_{\boldsymbol\delta}\mathrm{KL}\big|_{\boldsymbol\delta=\xi\mathbf d}\) (19.28), then use \(\mathbf x'=\mathbf x+\epsilon\,\boldsymbol\delta/\|\boldsymbol\delta\|_2\) (19.29). No domain knowledge is needed, only a step size \(\epsilon\).</li>
+          <li><b>Squared error vs KL</b> (Fig. 19.11): squared error saturates (gradient → 0) when the two predictions disagree confidently. KL grows without bound and has the same scale as the labeled cross-entropy, which makes \(\lambda\) easier to tune.</li>
+        </ul>
+      </div>
+      <div data-l="4">
+        <ul>
+          <li><b>Family tree.</b> The Π-model and temporal ensembling [LA16] use two stochastic passes, or a running average of past predictions, as the target. Mean Teacher [TV17] uses a weight-EMA teacher. VAT [Miy+18] uses adversarial perturbations. UDA [Xie+19] uses RandAugment or back-translation with KL and confidence masking. MixMatch/ReMixMatch [Ber+19b; Ber+19a] use sharpened, averaged targets plus mixup. FixMatch [Soh+20] uses a hard pseudo-label from a weak view as the target for a strong view.</li>
+          <li><b>Why it works.</b> For a small isotropic perturbation, \(\mathbb E\|p(\mathbf x)-p(\mathbf x+\boldsymbol\eta)\|^2\approx\sigma^2\|\nabla_{\mathbf x}p(\mathbf x)\|_F^2\). So the loss penalizes the input-gradient at data points: a data-dependent smoothness (Jacobian) penalty that pushes the boundary into low-density regions. That is the cluster assumption without entropy's degenerate "all one class" solution. VAT penalizes the top eigenvalue of the KL's input Hessian instead of its trace.</li>
+          <li><b>Binary VAT.</b> For a sigmoid output the KL Hessian in input space is \(q(1-q)\nabla_{\mathbf x}z\nabla_{\mathbf x}z^\top\), which has rank 1. One power-iteration step from any \(\mathbf d\) not orthogonal to \(\nabla_{\mathbf x}z\) gives \(\boldsymbol\delta\propto\pm\nabla_{\mathbf x}z\): straight across the boundary. That is what the arrows in the demo show.</li>
+          <li><b>Optimization geometry.</b> With consistency losses, SGD keeps moving far in weight space late in training. Athiwaratkun et al. [Ath+19] exploit this with a variant of stochastic weight averaging (fast-SWA) and get state-of-the-art SSL results.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="block play"><h3 class="blabel"><span class="tag">Play</span>Train with Eq. 19.27, then compare the two distances (Fig. 19.11)</h3>
+    <div class="panel">
+      <h4>Consistency regularization on the two moons</h4>
+      <p class="hint">The same data and labeled draws as §19.3.1, with the same RBF logistic model, trained by gradient descent (Adam) on Eq. 19.27. The labeled term is averaged over the M labels and the unlabeled term over the N points. Each step draws a fresh x′ for every unlabeled point. Arrows show x → x′ for some points at the current step. Draw B is the draw where self-training fell into confirmation bias.</p>
+      <div class="btns" style="margin-top:0">
+        <div class="seg" id="cr-draw"><button data-v="51" class="on">Draw A</button><button data-v="15">Draw B</button></div>
+        <div class="seg" id="cr-pert"><button data-v="noise" class="on">Gaussian noise</button><button data-v="vat">VAT</button></div>
+        <div class="seg" id="cr-div"><button data-v="se" class="on">squared error</button><button data-v="kl">KL</button></div>
+      </div>
+      <div class="ctrl"><label for="cr-sig" id="cr-sig-l">noise σ</label><input type="range" id="cr-sig" min="0.05" max="1" step="0.05" value="0.2"><output id="cr-sig-o"></output></div>
+      <div class="ctrl"><label for="cr-lam">λ (max)</label><input type="range" id="cr-lam" min="0" max="30" step="0.5" value="10"><output id="cr-lam-o"></output></div>
+      <div class="btns">
+        <label class="chk"><input type="checkbox" id="cr-ramp" checked> ramp λ up from 0</label>
+        <label class="chk"><input type="checkbox" id="cr-scratch"> start from scratch (w = 0)</label>
+        <label class="chk"><input type="checkbox" id="cr-arrows" checked> show x → x′</label>
+      </div>
+      <div class="btns"><button class="b pri" id="cr-run">Train 400 steps</button><button class="b" id="cr-reset">Reset</button></div>
+      <div class="two" style="margin-top:14px">
+        <div><p class="cap">p(B | x), boundary, labeled points, x → x′</p><svg class="plot" id="cr-plot" viewBox="0 0 520 340"></svg></div>
+        <div><p class="cap">vs training step</p><svg class="plot" id="cr-curve" viewBox="0 0 440 260"></svg>
+          <div class="keyrow"><span><i style="background:var(--mi)"></i>test accuracy</span><span><i class="d" style="color:var(--gap)"></i>λ(t) / λ</span><span><i style="background:var(--c5)"></i>consistency loss (scaled)</span></div>
+        </div>
+      </div>
+      <div class="readout" id="cr-stats"></div>
+      <p class="verdict" id="cr-say" style="font-size:17px"></p>
+    </div>
+
+    <div class="panel">
+      <h4>Fig. 19.11: squared error vs KL for one perturbed prediction</h4>
+      <p class="hint">Binary case. The clean prediction is fixed at \(p\) (the book's figure uses \(p=1\)). The horizontal axis is the logit \(z'\) of the perturbed input, with \(q'=\sigma(z')\). Squared error is \(\|p-q'\|^2=2(p-q')^2\) over both classes. Switch to gradients to see squared error go flat exactly where the two predictions disagree most.</p>
+      <div class="btns" style="margin-top:0"><div class="seg" id="cr-fig"><button data-v="loss" class="on">loss</button><button data-v="grad">|∂ loss / ∂z′|</button></div></div>
+      <div class="ctrl"><label for="cr-p">clean prediction p</label><input type="range" id="cr-p" min="0.5" max="1" step="0.01" value="1"><output id="cr-p-o"></output></div>
+      <div class="keyrow"><span><i style="background:var(--c3)"></i>squared error (Brier)</span><span><i style="background:var(--c5)"></i>KL(p ‖ q′)</span></div>
+      <div class="two">
+        <div><svg class="plot drag" id="cr-fig-plot" viewBox="0 0 520 300" tabindex="0" aria-label="Squared error and KL versus perturbed logit"></svg></div>
+        <div><div class="readout" id="cr-fig-stats" style="margin-top:0"></div><p class="verdict" id="cr-fig-say" style="font-size:16px"></p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="block math"><h3 class="blabel"><span class="tag">Math, slowly</span>Equations 19.27–19.29</h3>
+    <div class="mathcard">
+      <h4>The loss and its gradient</h4>
+      <ol class="steps">
+        <li><div>Perturb: \(\mathbf x_j'\sim q(\mathbf x'\mid\mathbf x_j)\), a fresh sample at every step.</div></li>
+        <li><div>Loss: \(-\sum_i\log p_\theta(y_i\mid\mathbf x_i)+\lambda\sum_j\|p_\theta(y\mid\mathbf x_j)-p_\theta(y\mid\mathbf x_j')\|^2\). <span class="why">(19.27)</span></div></li>
+        <li><div>Stop-gradient: treat \(p_j=p_\theta(y\mid\mathbf x_j)\) as a constant. Binary, with \(q_j'=\sigma(z_j')\): \(\dfrac{\partial}{\partial z_j'}2(p_j-q_j')^2=4(q_j'-p_j)\,q_j'(1-q_j')\). <span class="why">The factor \(q'(1-q')\) is why squared error saturates.</span></div></li>
+        <li><div>KL instead: \(\mathrm{KL}(p_j\,\|\,q_j')=p_j\log\frac{p_j}{q_j'}+(1-p_j)\log\frac{1-p_j}{1-q_j'}\), with \(\dfrac{\partial}{\partial z_j'}=q_j'-p_j\), the same form as the labeled cross-entropy gradient.</div></li>
+        <li><div>Small noise: \(\mathbb E_{\boldsymbol\eta\sim\mathcal N(0,\sigma^2\mathbf I)}\|p(\mathbf x)-p(\mathbf x+\boldsymbol\eta)\|^2\approx\sigma^2\|\nabla_{\mathbf x}p(\mathbf x)\|^2\): a smoothness penalty at the data.</div></li>
+      </ol>
+      <h4>Virtual adversarial training</h4>
+      <ol class="steps">
+        <li><div>Target: \(\boldsymbol\delta^*=\arg\max_{\|\boldsymbol\delta\|\le\epsilon}\mathrm{KL}\big(p_\theta(y\mid\mathbf x)\,\|\,p_\theta(y\mid\mathbf x+\boldsymbol\delta)\big)\).</div></li>
+        <li><div>At \(\boldsymbol\delta=0\) the KL and its gradient are both 0, so the maximizer is the top eigenvector of the Hessian \(\mathbf H\). One power-iteration step: \(\mathbf d\sim\mathcal N(0,\mathbf I)\), \(\boldsymbol\delta\leftarrow\nabla_{\boldsymbol\delta}\mathrm{KL}\big|_{\boldsymbol\delta=\xi\mathbf d}\approx\xi\mathbf H\mathbf d\), with \(\xi\approx10^{-6}\). <span class="why">(19.28)</span></div></li>
+        <li><div>Rescale: \(\mathbf x'=\mathbf x+\epsilon\,\boldsymbol\delta/\|\boldsymbol\delta\|_2\). <span class="why">(19.29)</span> Then apply (19.27) as usual.</div></li>
+        <li><div>Binary sigmoid model: \(\nabla_{\boldsymbol\delta}\mathrm{KL}=(q-p)\nabla_{\mathbf x}z(\mathbf x+\boldsymbol\delta)\), so \(\boldsymbol\delta\) points along \(\pm\nabla_{\mathbf x}z\): straight toward or away from the boundary. <span class="why">The demo computes this exactly, with \(\xi=10^{-6}\).</span></div></li>
+      </ol>
+      <div class="note">For the demo's RBF features \(\phi_k(\mathbf x)=e^{-g\|\mathbf x-\mathbf c_k\|^2}\), the input gradient is \(\nabla_{\mathbf x}z=\sum_kw_k\phi_k(\mathbf x)\cdot(-2g)(\mathbf x-\mathbf c_k)\).</div>
+    </div>
+  </div>
+
+  <div class="block quiz"><h3 class="blabel"><span class="tag">Check yourself</span>Consistency regularization</h3><div class="quizbox" data-quiz="cr"></div></div>
+</section>
+
 <section class="sec" id="cheat">
   <div class="sec-head"><span class="secnum">—</span><h2>Cheat sheet</h2></div>
   <div class="block">
@@ -911,11 +1018,17 @@ footer { padding-block: 32px; color: var(--muted); font-size: 14px; }
           <tr><th>Propagation step</th><td>Average neighbors, renormalize, clamp labels.</td><td>\(\mathbf Y\leftarrow\mathbf T\mathbf Y\), rows → 1, \(\mathbf Y_L\) fixed</td></tr>
           <tr><th>Fixed point</th><td>One linear solve over the unlabeled block.</td><td>\(\mathbf Y_U=(\mathbf I-\bar{\mathbf T}_{UU})^{-1}\bar{\mathbf T}_{UL}\mathbf Y_L\)</td></tr>
           <tr><th>Transductive vs inductive</th><td>Labels for this \(\mathcal D_U\) only vs a model \(f\) for any \(\mathbf x\).</td><td>train \(f\) on propagated labels</td></tr>
+                  <tr><th>Consistency (19.27)</th><td>Same prediction for x and a perturbed x′; no labels needed.</td><td>\(\lambda\sum_j\|p_\theta(y\mid\mathbf x_j)-p_\theta(y\mid\mathbf x_j')\|^2\)</td></tr>
+          <tr><th>Stop-gradient</th><td>The clean prediction is a fixed target.</td><td>no gradient through \(p_\theta(y\mid\mathbf x)\)</td></tr>
+          <tr><th>λ ramp-up</th><td>Start at 0 so early bad predictions aren't reinforced.</td><td>\(\lambda(t)=\lambda e^{-5(1-t/T)^2}\)</td></tr>
+          <tr><th>Augmentation q(x′ | x)</th><td>Must preserve the label; strong but label-preserving works best.</td><td>\(\mathbf x'\sim q(\mathbf x'\mid\mathbf x)\)</td></tr>
+          <tr><th>VAT (19.28–29)</th><td>Perturb in the direction that changes the output most.</td><td>\(\mathbf x'=\mathbf x+\epsilon\,\boldsymbol\delta/\|\boldsymbol\delta\|_2\)</td></tr>
+          <tr><th>Squared error vs KL</th><td>SE saturates when predictions disagree; KL is unbounded, on the cross-entropy scale.</td><td>\(4(q'-p)q'(1-q')\) vs \(q'-p\)</td></tr>
         </tbody>
       </table>
     </div>
   </div>
-  <footer>Built as a study companion for Murphy, <i>Probabilistic Machine Learning: An Introduction</i> (MIT Press, CC-BY-NC-ND), §19.3–19.3.4 (co-authored with Colin Raffel). All data on this page are synthetic and generated in the page from fixed seeds. The classifiers are logistic regressions on RBF features (fit by Newton's method) or on raw 2-D features, and every model, graph and fixed point is computed live in your browser.</footer>
+  <footer>Built as a study companion for Murphy, <i>Probabilistic Machine Learning: An Introduction</i> (MIT Press, CC-BY-NC-ND), §19.3–19.3.5 (co-authored with Colin Raffel). All data on this page are synthetic and generated in the page from fixed seeds. The classifiers are logistic regressions on RBF features (fit by Newton's method) or on raw 2-D features, and every model, graph and fixed point is computed live in your browser.</footer>
 </section>
 </main>
 </div>
@@ -1772,6 +1885,135 @@ const moGraph = () => MOG || (MOG = (() => { const W = knnGraph(MO.X, 8, 0.2); r
   load(); renderers.push(() => draw());
 })();
 
+/* ================= §19.3.5 consistency regularization ================= */
+(function () {
+  const svg = $('#cr-plot'), cur = $('#cr-curve'), K = MS.K, STEPS = 400, NU = 300;
+  let draw0 = 51, pert = 'noise', div = 'se', lab, w, m, v, t, hist, anim = 0, arrows = [], lastC = 0, rr = rng(9);
+  const sig = slider('cr-sig', v => v.toFixed(2)), lam = slider('cr-lam', v => v.toFixed(1));
+  const SHOW = range(36).map(k => (k * 37 + 11) % NU);
+  function gradX(w, x, y) { let gx = 0, gy = 0; for (let k = 0; k < MS.C.length; k++) { const dx = x - MS.C[k][0], dy = y - MS.C[k][1], e = Math.exp(-MS.g * (dx * dx + dy * dy)) * w[k + 1]; gx += -2 * MS.g * dx * e; gy += -2 * MS.g * dy * e; } return [gx, gy]; }
+  function perturb(i, p) {
+    const [x, y] = MO.X[i];
+    if (pert === 'noise') return [x + sig.v * gauss(rr), y + sig.v * gauss(rr)];
+    let d = [gauss(rr), gauss(rr)]; const n = Math.hypot(d[0], d[1]) || 1; d = [d[0] / n, d[1] / n];
+    const xi = 1e-6, q = sigm(dot(w, feat(MS, x + xi * d[0], y + xi * d[1]))), gz = gradX(w, x + xi * d[0], y + xi * d[1]);
+    const dl = [(q - p) * gz[0], (q - p) * gz[1]], nn = Math.hypot(dl[0], dl[1]);
+    if (!(nn > 0)) return [x + sig.v * d[0], y + sig.v * d[1]];
+    return [x + sig.v * dl[0] / nn, y + sig.v * dl[1] / nn];
+  }
+  const lamAt = t => $('#cr-ramp').checked ? lam.v * Math.exp(-5 * (1 - Math.min(1, t / (STEPS * 0.6))) ** 2) : lam.v;
+  function reset() {
+    stop(); lab = pickLabels(MO.y, 3, draw0);
+    w = $('#cr-scratch').checked ? new Float64Array(K) : fitIdx(MF, lab, lab.map(i => MO.y[i]));
+    m = new Float64Array(K); v = new Float64Array(K); t = 0; rr = rng(9); arrows = []; lastC = NaN;
+    hist = [{ t: 0, acc: predAcc(MFT, w, MOT.y), lam: 0, c: NaN }]; draw();
+  }
+  function step() {
+    t++; const g = new Float64Array(K), M = lab.length, L = lamAt(t);
+    lab.forEach(i => { const p = sigm(dot(w, MF[i])); for (let k = 0; k < K; k++) g[k] += (p - MO.y[i]) * MF[i][k] / M; });
+    let cl = 0; const ls = new Set(lab), keep = new Set(SHOW); arrows = [];
+    for (let i = 0; i < NU; i++) {
+      const p = sigm(dot(w, MF[i])), xp = perturb(i, p), f = feat(MS, xp[0], xp[1]), q = sigm(dot(w, f));
+      if (keep.has(i) && !ls.has(i)) arrows.push([i, xp]);
+      cl += div === 'se' ? 2 * (p - q) ** 2 : (p > 0 ? p * Math.log(p / q) : 0) + (p < 1 ? (1 - p) * Math.log((1 - p) / (1 - q)) : 0);
+      if (L > 0) { const c = div === 'se' ? 4 * (q - p) * q * (1 - q) : (q - p); for (let k = 0; k < K; k++) g[k] += L * c * f[k] / NU; }
+    }
+    lastC = cl / NU;
+    for (let k = 1; k < K; k++) g[k] += 0.03 * w[k] / M;
+    for (let k = 0; k < K; k++) { m[k] = .9 * m[k] + .1 * g[k]; v[k] = .999 * v[k] + .001 * g[k] * g[k]; w[k] -= 0.05 * (m[k] / (1 - .9 ** t)) / (Math.sqrt(v[k] / (1 - .999 ** t)) + 1e-8); }
+    if (t % 4 === 0 || t === STEPS) hist.push({ t, acc: predAcc(MFT, w, MOT.y), lam: L, c: lastC });
+  }
+  function stop() { if (anim) cancelAnimationFrame(anim); anim = 0; $('#cr-run').textContent = t >= STEPS ? 'Train 400 more' : 'Train 400 steps'; }
+  let target = STEPS;
+  $('#cr-run').addEventListener('click', () => {
+    if (anim) { stop(); return; }
+    if (t >= target) target = t + STEPS;
+    $('#cr-run').textContent = 'Pause';
+    const tick = () => { for (let s = 0; s < 4 && t < target; s++) step(); draw(); if (t < target) anim = requestAnimationFrame(tick); else stop(); };
+    anim = requestAnimationFrame(tick);
+  });
+  $('#cr-reset').addEventListener('click', () => { target = STEPS; reset(); });
+  segm('cr-draw', x => { draw0 = +x; target = STEPS; reset(); });
+  segm('cr-pert', x => { pert = x; $('#cr-sig-l').textContent = x === 'vat' ? 'VAT step ε' : 'noise σ'; if (!anim) draw(); });
+  segm('cr-div', x => { div = x; });
+  $('#cr-scratch').addEventListener('change', () => { target = STEPS; reset(); });
+  $('#cr-arrows').addEventListener('change', draw);
+  function previewArrows() { /* arrows for the current w without stepping */
+    const ls = new Set(lab); arrows = []; const keep = rr; rr = rng(77);
+    SHOW.forEach(i => { if (!ls.has(i)) arrows.push([i, perturb(i, sigm(dot(w, MF[i])))]); }); rr = keep;
+  }
+  [sig.el].forEach(e => e.addEventListener('input', () => { if (!anim) { previewArrows(); draw(); } }));
+  function draw() {
+    clear(svg);
+    const f = plot2(svg, MO.dom), [gw, gh] = gridDims(f, 130), g = rbfGrid(MS, MO.dom, gw, gh), P = rbfP(g, w);
+    field(svg, f, P, gw, gh); contour(svg, f, P, gw, gh, .5); border(svg, f);
+    const ls = new Set(lab);
+    MO.X.forEach((p, i) => { if (!ls.has(i)) unlab(svg, f.X(p[0]), f.Y(p[1])); });
+    if ($('#cr-arrows').checked) {
+      if (!arrows.length) previewArrows();
+      arrows.forEach(([i, xp]) => {
+        const x0 = f.X(MO.X[i][0]), y0 = f.Y(MO.X[i][1]), x1 = f.X(xp[0]), y1 = f.Y(xp[1]);
+        el('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: 'var(--ink)', 'stroke-width': 1.3, opacity: .75 }, svg);
+        el('circle', { cx: x1, cy: y1, r: 2.6, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 1.2 }, svg);
+        el('circle', { cx: x0, cy: y0, r: 2.6, fill: 'var(--ink)' }, svg);
+      });
+    }
+    lab.forEach(i => bigMark(svg, f.X(MO.X[i][0]), f.Y(MO.X[i][1]), MO.y[i]));
+    const h = hist[hist.length - 1], h0 = hist[0];
+    $('#cr-stats').innerHTML = stat('step', t) + stat('λ(t)', f2(lamAt(Math.max(t, 1)))) + stat('test accuracy', pct(h.acc), 'm') + stat('consistency loss (mean)', isFinite(lastC) ? f4(lastC) : '—', 'b') + stat('start', pct(h0.acc));
+    $$('#cr-stats .stat')[3].querySelector('.v').style.color = 'var(--c5)';
+    const cmax = Math.max(1e-9, ...hist.filter(r => isFinite(r.c)).map(r => r.c));
+    lineChart(cur, { x: [0, Math.max(STEPS, t)], y: [0, 1], yt: [0, .25, .5, .75, 1], fy: v => (100 * v).toFixed(0) + '%', xl: 'step', series: [
+      { pts: hist.map(r => [r.t, lam.v ? r.lam / lam.v : 0]), col: 'var(--gap)', dash: '5 4', w: 1.8 },
+      { pts: hist.filter(r => isFinite(r.c)).map(r => [r.t, r.c / cmax]), col: 'var(--c5)', w: 1.8 },
+      { pts: hist.map(r => [r.t, r.acc]), col: 'var(--mi)' }] });
+    const say = $('#cr-say'), d = h.acc - h0.acc;
+    if (!t) { say.className = 'verdict'; say.textContent = `Step 0: ${$('#cr-scratch').checked ? 'untrained (w = 0)' : 'the supervised fit'}, ${pct(h0.acc)} test accuracy. Press Train.`; }
+    else if (h.acc > 0.97) { say.className = 'verdict ok'; say.textContent = `${pct(h0.acc)} → ${pct(h.acc)}. Matching predictions under the perturbation pushed the boundary into the gap.`; }
+    else if (sig.v >= 0.5 && h.acc < h0.acc + 0.05) { say.className = 'verdict bad'; say.textContent = `${pct(h0.acc)} → ${pct(h.acc)}. With a perturbation this large, x′ often lands in the other moon. The "augmentation" changes the label, so enforcing consistency is wrong.`; }
+    else { say.className = 'verdict ' + (d > 0.01 ? 'ok' : d < -0.01 ? 'bad' : 'meh'); say.textContent = `${pct(h0.acc)} → ${pct(h.acc)} so far.`; }
+  }
+  reset(); renderers.push(draw);
+})();
+
+/* ---------- Fig. 19.11 ---------- */
+(function () {
+  const svg = $('#cr-fig-plot');
+  let z = -3.5, mode = 'loss', f;
+  const pS = slider('cr-p', v => v.toFixed(2), draw);
+  const se = (p, z) => 2 * (p - sigm(z)) ** 2;
+  const kl = (p, z) => { const q = sigm(z); return (p > 0 ? p * (Math.log(p) + softplus(-z)) : 0) + (p < 1 ? (1 - p) * (Math.log(1 - p) + softplus(z)) : 0); };
+  const gse = (p, z) => { const q = sigm(z); return Math.abs(4 * (q - p) * q * (1 - q)); };
+  const gkl = (p, z) => Math.abs(sigm(z) - p);
+  segm('cr-fig', x => { mode = x; draw(); });
+  function draw() {
+    clear(svg); const p = pS.v, G = mode === 'grad';
+    f = frame({ W: 520, H: 300, l: 44, r: 12, t: 12, b: 36, x: [-4, 4], y: G ? [0, 1] : [0, 2] });
+    axes(svg, f, { xt: [-4, -2, 0, 2, 4], yt: G ? [0, .25, .5, .75, 1] : [0, .5, 1, 1.5, 2], xl: "logit z′ of the perturbed input", yl: G ? '|gradient|' : 'loss' });
+    const g = clip(svg, f), zs = range(321).map(k => -4 + k * 0.025);
+    const A = G ? gse : se, B = G ? gkl : kl;
+    poly(g, zs.map(z => [f.X(z), f.Y(A(p, z))]), 'var(--c3)', 2.6);
+    poly(g, zs.map(z => [f.X(z), f.Y(Math.min(B(p, z), 5))]), 'var(--c5)', 2.6);
+    const zp = Math.log(p / (1 - p));
+    if (isFinite(zp) && zp <= 4) { el('line', { x1: f.X(zp), x2: f.X(zp), y1: f.T, y2: f.B, stroke: 'var(--muted)', 'stroke-dasharray': '2 4' }, g); txt(svg, f.X(zp) - 4, f.T + 12, 'q′ = p', 'ax', { 'text-anchor': 'end' }); }
+    el('line', { x1: f.X(z), x2: f.X(z), y1: f.T, y2: f.B, stroke: 'var(--ink)', opacity: .35 }, g);
+    [[A(p, z), '--c3'], [B(p, z), '--c5']].forEach(([v, c]) => el('circle', { cx: f.X(z), cy: f.Y(Math.min(v, G ? 1 : 2)), r: 5, fill: `var(${c})`, stroke: 'var(--surface)', 'stroke-width': 1.5 }, g));
+    if (!G && kl(p, -4) > 2) txt(svg, f.X(-1.6), f.T + 12, '← KL keeps rising off the chart', 'ax');
+    $('#cr-fig-stats').innerHTML = stat("z′", f2(z)) + stat("q′ = σ(z′)", f3(sigm(z))) + stat('squared error', f3(se(p, z))) + stat('KL', f3(kl(p, z)), 'b') + stat('|∂SE/∂z′|', f3(gse(p, z))) + stat('|∂KL/∂z′|', f3(gkl(p, z)), 'b');
+    $$('#cr-fig-stats .stat')[2].querySelector('.v').style.color = 'var(--c3)';
+    $$('#cr-fig-stats .stat')[4].querySelector('.v').style.color = 'var(--c3)';
+    $$('#cr-fig-stats .stat')[3].querySelector('.v').style.color = 'var(--c5)';
+    $$('#cr-fig-stats .stat')[5].querySelector('.v').style.color = 'var(--c5)';
+    const say = $('#cr-fig-say'), q = sigm(z);
+    if (Math.abs(q - p) > 0.6) { say.className = 'verdict meh'; say.textContent = gse(p, z) < 0.12 ? `The predictions disagree badly. The squared-error gradient has almost vanished (${f3(gse(p, z))}), so the model is barely updated, while the KL gradient is ${f3(gkl(p, z))}.` : `The predictions disagree. The squared-error gradient (${f3(gse(p, z))}) is already smaller than KL's (${f3(gkl(p, z))}) and goes to 0 as z′ moves further left.`; }
+    else if (Math.abs(q - p) < 0.05) { say.className = 'verdict ok'; say.textContent = 'The predictions agree: both losses and gradients are near 0.'; }
+    else { say.className = 'verdict'; say.textContent = 'Drag across the plot. Move z′ far left to see squared error saturate while KL keeps growing.'; }
+  }
+  onDrag(svg, pt => { z = clamp(f.iX(pt.x), -4, 4); draw(); }, pt => { z = clamp(f.iX(pt.x), -4, 4); draw(); });
+  svg.addEventListener('keydown', e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { z = clamp(z + (e.key === 'ArrowLeft' ? -.2 : .2), -4, 4); draw(); e.preventDefault(); } });
+  draw(); renderers.push(draw);
+})();
+
 /* ---------- quiz ---------- */
 const QUIZ = {
   ssl: [
@@ -1835,6 +2077,17 @@ const QUIZ = {
     { l: 'HS', q: 'Why is label propagation called transductive?', o: ['It only labels the given unlabeled points, rather than learning a model for new inputs', 'It transfers labels between tasks', 'It uses transformers', 'It needs a test set'], a: 0, w: 'Train any classifier on the propagated labels to get an inductive model.' },
     { l: 'Undergrad', q: 'On "Moons," raising k from 8 to 30 tends to…', o: ['add edges across the classes, so labels leak into the wrong moon', 'always improve accuracy', 'have no effect', 'disconnect the graph'], a: 0, w: 'The method lives or dies by the similarity graph.' },
     { l: 'Grad', q: 'In the random-walk view, Y_ic at the fixed point is…', o: ['the probability that a walk from i is first absorbed at a class-c labeled node', 'the number of class-c neighbors', 'the distance to the nearest class-c node', 'the stationary probability of node i'], a: 0, w: 'Make labeled nodes absorbing in the row-stochastic T̄. The fixed point gives the absorption probabilities.' }
+  ]
+  ,cr: [
+    { l: 'Kid', q: 'What rule does consistency regularization teach the model?', o: ['A slightly wiggled picture should get the same answer', 'Always pick the most common answer', 'Change your answer every time', 'Only look at labeled pictures'], a: 0, w: 'Small, label-preserving changes to the input shouldn\'t change the prediction.' },
+    { l: 'HS', q: 'Why can consistency regularization use unlabeled data?', o: ['It only compares the model\'s own outputs on x and x′; no true label is needed', 'It guesses the labels at random', 'It needs a doctor to check each point', 'It can\'t; it only uses labeled data'], a: 0, w: 'The penalty ‖p(y|x) − p(y|x′)‖² involves model outputs only.' },
+    { l: 'HS', q: 'In the demo, what goes wrong with a noise size σ of about 0.6 or more?', o: ['x′ often lands in the other moon, so the perturbation changes the label', 'Training becomes too slow', 'The labeled points move', 'Nothing; bigger is always better'], a: 0, w: 'Transformations must be label-preserving. Too-strong noise breaks that assumption.' },
+    { l: 'Undergrad', q: 'In Eq. 19.27, the clean prediction p_θ(y | x) is usually…', o: ['treated as fixed, with no gradient through it', 'replaced by the true label', 'averaged over the labeled set', 'set to uniform'], a: 0, w: 'Only the perturbed prediction is pulled toward it.' },
+    { l: 'Undergrad', q: 'Why is λ often ramped up from 0?', o: ['Early on the model is poor, and a large λ would reinforce its own bad predictions', 'To save memory', 'Because the labeled loss grows over time', 'λ must equal the learning rate'], a: 0, w: 'The book compares this to confirmation bias in self-training.' },
+    { l: 'Undergrad', q: 'VAT chooses the perturbation δ that…', o: ['approximately maximizes KL(p(y | x) ‖ p(y | x + δ)), rescaled to norm ε', 'is pure Gaussian noise', 'minimizes the labeled loss', 'rotates the image by 90°'], a: 0, w: 'One power-iteration step from a random d (Eq. 19.28), then x′ = x + εδ/‖δ‖ (Eq. 19.29).' },
+    { l: 'Undergrad', q: 'Fig. 19.11: when the perturbed prediction confidently disagrees with the clean one, the squared-error loss…', o: ['saturates, so its gradient goes to 0', 'grows without bound', 'equals the KL divergence', 'becomes negative'], a: 0, w: 'Its gradient has a factor q′(1 − q′). KL\'s gradient q′ − p does not vanish.' },
+    { l: 'Undergrad', q: 'An advantage of KL over squared error for the consistency term is…', o: ['it is on the same scale as the labeled cross-entropy, so λ is easier to tune', 'it is always smaller', 'it never needs a stop-gradient', 'it ignores unstable predictions'], a: 0, w: 'The book: KL "has the same scale as the cross-entropy loss used for labeled data."' },
+    { l: 'Grad', q: 'For small isotropic noise, the squared-error consistency loss approximately penalizes…', o: ['σ² ‖∇ₓ p(x)‖², the input-gradient at data points', 'the weight norm', 'the entropy of p̄', 'the number of labeled points'], a: 0, w: 'A Taylor expansion gives a Jacobian penalty: smooth at the data, so the boundary moves into low-density regions.' }
   ]
 };
 
